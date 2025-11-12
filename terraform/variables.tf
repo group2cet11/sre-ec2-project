@@ -21,3 +21,9 @@ variable "ami_id" {
   # Replace if needed; validate in your account/region
   default     = "ami-0c101f26f147fa7fd"
 }
+
+variable "userdata_revision" {
+  description = "Bump to force EC2 replacement and re-run user_data"
+  type        = number
+  default     = 1
+}
