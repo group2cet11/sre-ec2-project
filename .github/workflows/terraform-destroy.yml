@@ -50,8 +50,13 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::108471662249:role/github-oidc-role-dev   # <-- adjust per env if you have separate roles
+          role-to-assume: arn:aws:iam::108471662249:role/GhaDeployRole
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.5
 
       - name: Terraform Init
         run: terraform init -backend-config=backend.${{ github.event.inputs.env }}.tfvars
