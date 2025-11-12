@@ -1,7 +1,7 @@
 name: Backend bootstrap
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
 
 env:
   AWS_REGION: us-east-1
@@ -12,6 +12,8 @@ jobs:
     permissions:
       id-token: write
       contents: read
+
+    # all commands run inside the backend-bootstrap module
     defaults:
       run:
         working-directory: terraform/backend-bootstrap
@@ -32,10 +34,10 @@ jobs:
           terraform_version: 1.8.5
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -input=false
 
-      # ⬇️ Import the existing lock table if it already exists
-      - name: Import lock table if it already exists
+      # 👇 Import the lock table if it already exists (harmless if not)
+      - name: Import existing DynamoDB lock table (if present)
         shell: bash
         run: |
           set -euo pipefail
@@ -43,12 +45,12 @@ jobs:
 
           echo "Checking if DynamoDB table '$LOCK_TABLE' exists..."
           if aws dynamodb describe-table --table-name "$LOCK_TABLE" >/dev/null 2>&1; then
-          echo "Table exists. Importing into Terraform state…"
-          terraform import -input=false aws_dynamodb_table.locks "$LOCK_TABLE" || true
-        else
-          echo "Table not found. It will be created by 'terraform apply'."
-    fi
-
+            echo "Table exists. Importing into Terraform state…"
+            # If it's already imported, ignore the error so the job keeps going
+            terraform import -input=false aws_dynamodb_table.locks "$LOCK_TABLE" || true
+          else
+            echo "Table not found. It will be created by 'terraform apply'."
+          fi
 
       - name: Terraform Apply (create backend)
-        run: terraform apply -auto-approve
+        run: terraform apply -auto-approve -input=false
