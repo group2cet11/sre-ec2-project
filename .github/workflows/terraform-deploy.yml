@@ -1,5 +1,4 @@
 name: Terraform EC2 Deployment
-
 on:
   push:
     branches: [ "main" ]
