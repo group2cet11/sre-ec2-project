@@ -39,16 +39,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          LOCK_TABLE="terraform-locks"  # must match var.lock_table_name
+          LOCK_TABLE="terraform-locks"
 
           echo "Checking if DynamoDB table '$LOCK_TABLE' exists..."
           if aws dynamodb describe-table --table-name "$LOCK_TABLE" >/dev/null 2>&1; then
-            echo "Table exists. Importing into Terraform state…"
-            # Safe even if already imported (we ignore non-zero with || true)
-            terraform import -input=false aws_dynamodb_table.locks "$LOCK_TABLE" || true
-          else
-            echo "Table not found. It will be created by 'terraform apply'."
-          fi
+          echo "Table exists. Importing into Terraform state…"
+          terraform import -input=false aws_dynamodb_table.locks "$LOCK_TABLE" || true
+        else
+          echo "Table not found. It will be created by 'terraform apply'."
+    fi
+
 
       - name: Terraform Apply (create backend)
         run: terraform apply -auto-approve
