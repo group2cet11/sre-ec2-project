@@ -1,7 +1,7 @@
-name: Terraform Backend Bootstrap
+name: Backend bootstrap
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 env:
   AWS_REGION: us-east-1
@@ -15,8 +15,10 @@ jobs:
     defaults:
       run:
         working-directory: terraform/backend-bootstrap
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -32,5 +34,21 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
-      - name: Terraform Apply (create backend resources)
+      # ⬇️ Import the existing lock table if it already exists
+      - name: Import lock table if it already exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          LOCK_TABLE="terraform-locks"  # must match var.lock_table_name
+
+          echo "Checking if DynamoDB table '$LOCK_TABLE' exists..."
+          if aws dynamodb describe-table --table-name "$LOCK_TABLE" >/dev/null 2>&1; then
+            echo "Table exists. Importing into Terraform state…"
+            # Safe even if already imported (we ignore non-zero with || true)
+            terraform import -input=false aws_dynamodb_table.locks "$LOCK_TABLE" || true
+          else
+            echo "Table not found. It will be created by 'terraform apply'."
+          fi
+
+      - name: Terraform Apply (create backend)
         run: terraform apply -auto-approve
