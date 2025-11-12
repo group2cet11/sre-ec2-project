@@ -1,4 +1,5 @@
 name: Terraform EC2 Deployment
+
 on:
   push:
     branches: [ "main" ]
@@ -13,6 +14,11 @@ jobs:
     permissions:
       id-token: write
       contents: read
+
+    # <-- All `run:` steps below will execute in the terraform/ folder
+    defaults:
+      run:
+        working-directory: terraform
 
     steps:
       - name: Checkout
@@ -29,14 +35,14 @@ jobs:
         with:
           terraform_version: 1.8.5
 
-      - name: Terraform Init
-        run: terraform init -backend-config=terraform/backend.dev.tfvars
+      - name: Terraform Init (dev backend)
+        run: terraform init -backend-config=backend.dev.tfvars
 
       - name: Terraform Validate
         run: terraform validate
 
-      - name: Terraform Plan
-        run: terraform plan -var-file=terraform/envs/dev.tfvars -out=tfplan
+      - name: Terraform Plan (dev)
+        run: terraform plan -var-file=envs/dev.tfvars -out=tfplan
 
-      - name: Terraform Apply
+      - name: Terraform Apply (dev)
         run: terraform apply -auto-approve tfplan
