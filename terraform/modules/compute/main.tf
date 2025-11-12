@@ -53,31 +53,79 @@ resource "aws_instance" "web" {
 
   user_data = <<-EOF
     #!/bin/bash
+    set -euo pipefail
+
     dnf update -y
     dnf install -y nginx python3 python3-pip
-    systemctl enable nginx
-    systemctl start nginx
 
-    # Simple Flask app
-    cat << 'APP' > /home/ec2-user/app.py
+    # --- Flask app on 8080 (bind to localhost for safety) ---
+    mkdir -p /opt/app
+    cat << 'APP' > /opt/app/app.py
     from flask import Flask
     app = Flask(__name__)
-    @app.route('/')
+    @app.route("/")
     def home():
         return "Hello from Flask on EC2 - ${var.environment}"
-    if __name__ == '__main__':
-        app.run(host='0.0.0.0', port=8080)
+    if __name__ == "__main__":
+        app.run(host="127.0.0.1", port=8080)
     APP
 
-    pip install flask
-    nohup python3 /home/ec2-user/app.py &
+    python3 -m pip install --upgrade pip
+    pip3 install flask
+
+    # Systemd service so Flask stays running
+    cat << 'UNIT' > /etc/systemd/system/flask.service
+    [Unit]
+    Description=Flask App
+    After=network.target
+
+    [Service]
+    User=root
+    WorkingDirectory=/opt/app
+    ExecStart=/usr/bin/python3 /opt/app/app.py
+    Restart=always
+    RestartSec=5
+    StandardOutput=journal
+    StandardError=journal
+
+    [Install]
+    WantedBy=multi-user.target
+    UNIT
+
+    systemctl daemon-reload
+    systemctl enable flask
+    systemctl start flask
+
+    # --- Nginx reverse proxy: :80 -> 127.0.0.1:8080 ---
+    mkdir -p /etc/nginx/conf.d
+    cat << 'CONF' > /etc/nginx/conf.d/flask.conf
+    server {
+      listen 80 default_server;
+      listen [::]:80 default_server;
+      server_name _;
+
+      location / {
+        proxy_pass         http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header   Host $host;
+        proxy_set_header   X-Real-IP $remote_addr;
+        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout  60s;
+      }
+    }
+    CONF
+
+    # Remove default welcome page if present
+    rm -f /usr/share/nginx/html/index.html || true
+
+    systemctl enable nginx
+    systemctl restart nginx
   EOF
 
-  tags = {
-    Name = "sre-${var.environment}-ec2"
-  }
+  tags = { Name = "sre-${var.environment}-ec2" }
 }
-
 ############################################
 # outputs (returned to root module)
 ############################################
