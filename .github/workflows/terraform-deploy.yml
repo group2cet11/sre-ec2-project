@@ -14,6 +14,13 @@ on:
 
 env:
   AWS_REGION: us-east-1
+  # Make ENV available for both push (defaults to dev) and manual runs (uses input)
+  ENV: ${{ github.event.inputs.env != '' && github.event.inputs.env || 'dev' }}
+
+# Prevent overlapping applies to the same env
+concurrency:
+  group: deploy-${{ env.ENV }}
+  cancel-in-progress: false
 
 jobs:
   terraform:
@@ -21,10 +28,6 @@ jobs:
     permissions:
       id-token: write
       contents: read
-
-    # Make env available whether triggered by push or workflow_dispatch
-    env:
-      ENV: ${{ github.event.inputs.env || 'dev' }}
 
     defaults:
       run:
@@ -45,6 +48,9 @@ jobs:
         with:
           terraform_version: 1.8.5
 
+      - name: Show selected environment (debug)
+        run: echo "ENV=${ENV}"
+
       - name: Terraform Init (remote backend)
         run: terraform init -backend-config=backend.${{ env.ENV }}.tfvars
 
@@ -54,13 +60,16 @@ jobs:
       - name: Terraform Plan (${{ env.ENV }})
         run: terraform plan -var-file=envs/${{ env.ENV }}.tfvars -out=tfplan
 
+      # Optional: block prod on push; allow prod only for manual runs
       - name: Terraform Apply (${{ env.ENV }})
+        if: ${{ github.event_name == 'workflow_dispatch' || env.ENV != 'prod' }}
         run: terraform apply -auto-approve tfplan
 
       - name: Publish EC2 link to Summary
         run: |
           IP=$(terraform output -json | jq -r '.public_ip.value')
           echo "## EC2 Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${ENV}" >> $GITHUB_STEP_SUMMARY
           echo "**Public IP:** $IP" >> $GITHUB_STEP_SUMMARY
           echo "[Open Website](http://$IP)" >> $GITHUB_STEP_SUMMARY
           echo "[Open EC2 in AWS Console](https://console.aws.amazon.com/ec2/v2/home?region=${AWS_REGION}#Instances:search=$IP)" >> $GITHUB_STEP_SUMMARY
