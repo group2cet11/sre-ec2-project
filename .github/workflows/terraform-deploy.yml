@@ -52,3 +52,12 @@ jobs:
 
       - name: Terraform Apply (dev)
         run: terraform apply -auto-approve tfplan
+
+      - name: Terraform Output (public IP)
+        run: terraform output -json | jq -r '.public_ip.value'
+
+      - name: Publish EC2 IP to Summary
+        run: |
+          echo "## ✅ EC2 Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          echo "Public IP: $(terraform output -json | jq -r '.public_ip.value')" >> $GITHUB_STEP_SUMMARY
+
