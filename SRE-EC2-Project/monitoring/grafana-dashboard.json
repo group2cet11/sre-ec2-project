@@ -1,0 +1,8 @@
+{
+  "title": "EC2 Overview",
+  "panels": [
+    { "type": "graph", "title": "CPU Utilization", "targets": [], "id": 1 }
+  ],
+  "schemaVersion": 36,
+  "version": 1
+}
