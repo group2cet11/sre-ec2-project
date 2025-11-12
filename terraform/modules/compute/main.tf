@@ -56,6 +56,7 @@ resource "aws_instance" "web" {
 
   user_data = <<EOF
 #!/bin/bash
+# user-data revision: ${var.userdata_revision}
 # Log everything for troubleshooting
 exec > >(tee -a /var/log/user-data.log) 2>&1
 
