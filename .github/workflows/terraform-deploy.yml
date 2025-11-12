@@ -15,11 +15,11 @@ on:
 env:
   AWS_REGION: us-east-1
   # Make ENV available for both push (defaults to dev) and manual runs (uses input)
-  ENV: ${{ github.event.inputs.env != '' && github.event.inputs.env || 'dev' }}
+  ENV: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.env || 'dev' }}
 
-# Prevent overlapping applies to the same env
+# Top-level concurrency cannot read env.*, so compute from github.* directly
 concurrency:
-  group: deploy-${{ env.ENV }}
+  group: deploy-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.env || 'dev' }}
   cancel-in-progress: false
 
 jobs:
