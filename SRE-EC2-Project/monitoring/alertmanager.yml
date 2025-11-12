@@ -1,7 +1,0 @@
-route:
-  receiver: 'email'
-
-receivers:
-  - name: 'email'
-    email_configs:
-      - to: 'you@example.com'
