@@ -1,0 +1,39 @@
+name: Terraform EC2 Destroy
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: "Environment"
+        required: true
+        default: dev
+        type: choice
+        options: [dev, uat, prod]
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::108471662249:role/github-oidc-role-dev
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.5
+
+      - name: Terraform Init
+        run: terraform -chdir=terraform init -backend-config=backend.${{ inputs.env }}.tfvars
+
+      - name: Terraform Destroy
+        run: terraform -chdir=terraform destroy -auto-approve -var-file=envs/${{ inputs.env }}.tfvars
