@@ -96,4 +96,4 @@ terraform plan -var-file=terraform/envs/dev.tfvars -out=tfplan
 terraform apply tfplan
 ```
 
-> The GitHub Actions workflow will do most of this automatically on push to `main` once OIDC is configured.
+> The GitHub Actions workflow will do most of this automatically on push to `main` once OIDC is configured. 
