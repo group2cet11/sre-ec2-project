@@ -51,6 +51,9 @@ resource "aws_instance" "web" {
   subnet_id              = var.subnet_id
   vpc_security_group_ids = [aws_security_group.web_sg.id]
 
+  # 👇 Ensure a new instance is created whenever user_data changes
+  user_data_replace_on_change = true
+
   user_data = <<EOF
 #!/bin/bash
 # Log everything for troubleshooting
