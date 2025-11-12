@@ -11,7 +11,7 @@ on:
         default: dev
         type: choice
         options: [dev, uat, prod]
-        
+
 env:
   AWS_REGION: us-east-1
 
@@ -22,7 +22,6 @@ jobs:
       id-token: write
       contents: read
 
-    # Run all shell steps from the terraform/ directory
     defaults:
       run:
         working-directory: terraform
@@ -34,11 +33,13 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::108471662249:role/github-oidc-role-dev
+          # assume the role based on selected env
+          role-to-assume: ${{ fromJson('{
+            "dev":  "arn:aws:iam::108471662249:role/github-oidc-role-dev",
+            "uat":  "arn:aws:iam::108471662249:role/github-oidc-role-uat",
+            "prod": "arn:aws:iam::108471662249:role/github-oidc-role-prod"
+          }')[inputs.env] }}
           aws-region: ${{ env.AWS_REGION }}
-
-      - name: Who am I? (debug)
-        run: aws sts get-caller-identity
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -46,37 +47,33 @@ jobs:
           terraform_version: 1.8.5
 
       - name: Show files (debug)
-        run: ls -la
+        run: ls -la && tree -L 2 || true
 
-      - name: Terraform Init (dev backend)
-        run: terraform init -backend-config=backend.dev.tfvars
+      - name: Terraform Init (remote backend)
+        run: |
+          terraform init \
+            -backend-config=backend.${{ inputs.env }}.tfvars
 
       - name: Terraform Validate
         run: terraform validate
 
-      - name: Terraform Plan (dev)
-        run: terraform plan -var-file=envs/dev.tfvars -out=tfplan
+      - name: Terraform Plan (${{ inputs.env }})
+        run: terraform plan -var-file=envs/${{ inputs.env }}.tfvars -out=tfplan
 
-      - name: Terraform Apply (dev)
+      - name: Terraform Apply (${{ inputs.env }})
         run: terraform apply -auto-approve tfplan
 
       - name: Terraform Output (public IP)
-        run: terraform output -json | jq -r '.public_ip.value'
+        id: tfout
+        run: |
+          terraform output -json | jq -r '.public_ip.value'
 
       - name: Publish EC2 link to Summary
-        shell: bash
         run: |
           IP=$(terraform output -json | jq -r '.public_ip.value')
-          if [[ -n "$IP" && "$IP" != "null" ]]; then
-            echo "## ✅ EC2 Deployment Successful" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Public IP:** $IP" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "[🔗 Open Website](http://$IP)" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "[🔍 Open EC2 in AWS Console](https://console.aws.amazon.com/ec2/v2/home?region=us-east-1#Instances:search=$IP)" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "No public_ip output found." >> $GITHUB_STEP_SUMMARY
-          fi
-
-
+          echo "## EC2 Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Public IP:** $IP" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "[Open Website](http://$IP)" >> $GITHUB_STEP_SUMMARY
+          echo "[Open EC2 in AWS Console](https://console.aws.amazon.com/ec2/v2/home?region=${AWS_REGION}#Instances:search=$IP)" >> $GITHUB_STEP_SUMMARY
