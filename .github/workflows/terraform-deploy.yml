@@ -56,8 +56,20 @@ jobs:
       - name: Terraform Output (public IP)
         run: terraform output -json | jq -r '.public_ip.value'
 
-      - name: Publish EC2 IP to Summary
+      - name: Publish EC2 link to Summary
+        shell: bash
         run: |
-          echo "## ✅ EC2 Deployment Successful" >> $GITHUB_STEP_SUMMARY
-          echo "Public IP: $(terraform output -json | jq -r '.public_ip.value')" >> $GITHUB_STEP_SUMMARY
+          IP=$(terraform output -json | jq -r '.public_ip.value')
+          if [[ -n "$IP" && "$IP" != "null" ]]; then
+            echo "## ✅ EC2 Deployment Successful" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Public IP:** $IP" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "[🔗 Open Website](http://$IP)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "[🔍 Open EC2 in AWS Console](https://console.aws.amazon.com/ec2/v2/home?region=us-east-1#Instances:search=$IP)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No public_ip output found." >> $GITHUB_STEP_SUMMARY
+          fi
+
 
