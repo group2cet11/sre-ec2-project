@@ -4,7 +4,14 @@ on:
   push:
     branches: [ "main" ]
   workflow_dispatch:
-
+    inputs:
+      env:
+        description: "Environment to deploy"
+        required: true
+        default: dev
+        type: choice
+        options: [dev, uat, prod]
+        
 env:
   AWS_REGION: us-east-1
 
