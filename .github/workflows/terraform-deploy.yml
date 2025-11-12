@@ -15,7 +15,7 @@ jobs:
       id-token: write
       contents: read
 
-    # <-- All `run:` steps below will execute in the terraform/ folder
+    # Run all shell steps from the terraform/ directory
     defaults:
       run:
         working-directory: terraform
@@ -30,10 +30,16 @@ jobs:
           role-to-assume: arn:aws:iam::108471662249:role/github-oidc-role-dev
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Who am I? (debug)
+        run: aws sts get-caller-identity
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.8.5
+
+      - name: Show files (debug)
+        run: ls -la
 
       - name: Terraform Init (dev backend)
         run: terraform init -backend-config=backend.dev.tfvars
