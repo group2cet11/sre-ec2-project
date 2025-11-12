@@ -21,6 +21,8 @@ module "compute" {
   instance_type  = var.instance_type
   ami_id         = var.ami_id
   environment    = var.environment
+  # pass through the revision switch
+  userdata_revision = var.userdata_revision
 }
 
 # Monitoring (minimal CW Log Group)
