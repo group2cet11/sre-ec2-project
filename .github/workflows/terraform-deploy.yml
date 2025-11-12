@@ -37,8 +37,7 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          # 👇 single-line JSON map + fromJson + index by env.ENV
-          role-to-assume: ${{ fromJson('{"dev":"arn:aws:iam::108471662249:role/github-oidc-role-dev","uat":"arn:aws:iam::108471662249:role/github-oidc-role-uat","prod":"arn:aws:iam::108471662249:role/github-oidc-role-prod"}')[env.ENV] }}
+          role-to-assume: arn:aws:iam::108471662249:role/GhaDeployRole
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup Terraform
