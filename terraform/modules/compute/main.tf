@@ -51,102 +51,102 @@ resource "aws_instance" "web" {
   subnet_id              = var.subnet_id
   vpc_security_group_ids = [aws_security_group.web_sg.id]
 
-  user_data = <<-EOF
-    #!/bin/bash
-    set -euo pipefail
+  user_data = <<EOF
+#!/bin/bash
+# Log everything for troubleshooting
+exec > >(tee -a /var/log/user-data.log) 2>&1
 
-    dnf update -y
-    dnf install -y nginx python3 python3-pip
+dnf update -y
+dnf install -y nginx python3 python3-pip || true
 
-    # --- Flask app on 127.0.0.1:8080 ---
-    mkdir -p /opt/app
-    cat << 'APP' > /opt/app/app.py
-    from flask import Flask, jsonify
-    app = Flask(__name__)
+# --- Put our index page so the welcome page is replaced immediately ---
+mkdir -p /usr/share/nginx/html
+cat << 'INDEX' > /usr/share/nginx/html/index.html
+<!doctype html>
+<html>
+  <head><meta charset="utf-8"><title>SRE EC2</title></head>
+  <body style="font-family: system-ui, Arial">
+    <h1>Welcome to SRE EC2 (${var.environment})</h1>
+    <p>Static page served by <b>Nginx</b>.</p>
+    <p>API endpoints: <a href="/api">/api</a> · <a href="/api/health">/api/health</a></p>
+  </body>
+</html>
+INDEX
 
-    @app.route("/api")
-    def api_root():
-        return jsonify(message="Hello from Flask API - ${var.environment}", env="${var.environment}")
+# --- Nginx reverse proxy for /api -> Flask on 127.0.0.1:8080 ---
+mkdir -p /etc/nginx/conf.d
+cat << 'CONF' > /etc/nginx/conf.d/app.conf
+server {
+  listen 80 default_server;
+  listen [::]:80 default_server;
+  server_name _;
 
-    @app.route("/api/health")
-    def health():
-        return jsonify(status="ok")
+  root /usr/share/nginx/html;
+  index index.html;
 
-    if __name__ == "__main__":
-        app.run(host="127.0.0.1", port=8080)
-    APP
+  location /api/ {
+    proxy_pass         http://127.0.0.1:8080/;
+    proxy_http_version 1.1;
+    proxy_set_header   Host $host;
+    proxy_set_header   X-Real-IP $remote_addr;
+    proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header   X-Forwarded-Proto $scheme;
+    proxy_connect_timeout 5s;
+    proxy_read_timeout  60s;
+  }
+}
+CONF
 
-    python3 -m pip install --upgrade pip
-    pip3 install flask
+systemctl enable nginx
+systemctl restart nginx
 
-    # systemd service to keep Flask running
-    cat << 'UNIT' > /etc/systemd/system/flask.service
-    [Unit]
-    Description=Flask API
-    After=network.target
+# --- Flask API on 127.0.0.1:8080 ---
+mkdir -p /opt/app
+cat << 'APP' > /opt/app/app.py
+from flask import Flask, jsonify
+app = Flask(__name__)
 
-    [Service]
-    User=root
-    WorkingDirectory=/opt/app
-    ExecStart=/usr/bin/python3 /opt/app/app.py
-    Restart=always
-    RestartSec=5
-    StandardOutput=journal
-    StandardError=journal
+@app.route("/api")
+def api_root():
+    return jsonify(message="Hello from Flask API - ${var.environment}", env="${var.environment}")
 
-    [Install]
-    WantedBy=multi-user.target
-    UNIT
+@app.route("/api/health")
+def health():
+    return jsonify(status="ok")
 
-    systemctl daemon-reload
-    systemctl enable flask
-    systemctl start flask
+if __name__ == "__main__":
+    app.run(host="127.0.0.1", port=8080)
+APP
 
-    # --- Nginx config ---
-    # Static homepage at /
-    mkdir -p /usr/share/nginx/html
-    cat << 'INDEX' > /usr/share/nginx/html/index.html
-    <!doctype html>
-    <html>
-      <head><meta charset="utf-8"><title>SRE EC2</title></head>
-      <body style="font-family: system-ui, Arial">
-        <h1>Welcome to SRE EC2 (${var.environment})</h1>
-        <p>Static page served by <b>Nginx</b>.</p>
-        <p>Try the API: <a href="/api">/api</a> &middot; <a href="/api/health">/api/health</a></p>
-      </body>
-    </html>
-    INDEX
+python3 -m pip install --upgrade pip || true
+pip3 install flask || true
 
-    # Reverse proxy /api -> Flask on 127.0.0.1:8080
-    mkdir -p /etc/nginx/conf.d
-    cat << 'CONF' > /etc/nginx/conf.d/app.conf
-    server {
-      listen 80 default_server;
-      listen [::]:80 default_server;
-      server_name _;
+cat << 'UNIT' > /etc/systemd/system/flask.service
+[Unit]
+Description=Flask API
+After=network.target
 
-      # Static root for /
-      root /usr/share/nginx/html;
-      index index.html;
+[Service]
+User=root
+WorkingDirectory=/opt/app
+ExecStart=/usr/bin/python3 /opt/app/app.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
 
-      location /api/ {
-        proxy_pass         http://127.0.0.1:8080/; # note trailing slash to keep paths
-        proxy_http_version 1.1;
-        proxy_set_header   Host $host;
-        proxy_set_header   X-Real-IP $remote_addr;
-        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto $scheme;
-        proxy_connect_timeout 5s;
-        proxy_read_timeout  60s;
-      }
-    }
-    CONF
+[Install]
+WantedBy=multi-user.target
+UNIT
 
-    # Remove default welcome page if present and (re)start nginx
-    rm -f /usr/share/nginx/html/*.png /usr/share/nginx/html/*.svg /usr/share/nginx/html/50x.html || true
-    systemctl enable nginx
-    systemctl restart nginx
-  EOF
+systemctl daemon-reload
+systemctl enable flask
+systemctl restart flask || systemctl start flask
+
+# Show status to the log
+systemctl status nginx --no-pager || true
+systemctl status flask --no-pager || true
+EOF
 
   tags = { Name = "sre-${var.environment}-ec2" }
 }
