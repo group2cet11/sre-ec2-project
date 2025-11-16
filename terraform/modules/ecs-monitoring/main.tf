@@ -126,8 +126,6 @@ resource "aws_ecs_cluster" "cluster" {
   name = "${local.name}-cluster"
 }
 
-# (Your EFS fs / mount targets are assumed to be defined elsewhere in this file)
-
 # Task definition with 4 containers sharing EFS volumes
 resource "aws_ecs_task_definition" "task" {
   family                   = "${local.name}-task"
