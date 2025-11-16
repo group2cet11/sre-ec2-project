@@ -44,11 +44,10 @@ resource "aws_security_group" "svc" {
   }
 }
 
-
 # ---------- IAM ----------
 # Task execution role (pull images, write logs)
 resource "aws_iam_role" "exec" {
-  name = "${local.name}-exec"
+  name               = "${local.name}-exec"
   assume_role_policy = data.aws_iam_policy_document.exec_assume.json
 }
 
@@ -70,29 +69,32 @@ resource "aws_iam_role_policy_attachment" "exec_attach" {
 
 # Task role (runtime perms for Prometheus EC2 SD + S3 read)
 resource "aws_iam_role" "task" {
-  name = "${local.name}-task"
+  name               = "${local.name}-task"
   assume_role_policy = data.aws_iam_policy_document.exec_assume.json
 }
 
 data "aws_iam_policy_document" "task_policy" {
   statement {
-    sid     = "EC2Describe"
-    actions = ["ec2:DescribeInstances", "ec2:DescribeTags"]
+    sid       = "EC2Describe"
+    actions   = ["ec2:DescribeInstances", "ec2:DescribeTags"]
     resources = ["*"]
   }
+
   statement {
     sid     = "S3ReadConfigs"
     actions = ["s3:GetObject", "s3:ListBucket"]
     resources = [
       "arn:aws:s3:::${var.config_bucket}",
-      "arn:aws:s3:::${var.config_bucket}/*"
+      "arn:aws:s3:::${var.config_bucket}/*",
     ]
   }
 }
+
 resource "aws_iam_policy" "task" {
   name   = "${local.name}-task-policy"
   policy = data.aws_iam_policy_document.task_policy.json
 }
+
 resource "aws_iam_role_policy_attachment" "task_attach" {
   role       = aws_iam_role.task.name
   policy_arn = aws_iam_policy.task.arn
@@ -103,14 +105,17 @@ resource "aws_cloudwatch_log_group" "lg_prom" {
   name              = "/ecs/${local.name}/prometheus"
   retention_in_days = 14
 }
+
 resource "aws_cloudwatch_log_group" "lg_alert" {
   name              = "/ecs/${local.name}/alertmanager"
   retention_in_days = 14
 }
+
 resource "aws_cloudwatch_log_group" "lg_graf" {
   name              = "/ecs/${local.name}/grafana"
   retention_in_days = 14
 }
+
 resource "aws_cloudwatch_log_group" "lg_cfg" {
   name              = "/ecs/${local.name}/config-sync"
   retention_in_days = 7
@@ -120,6 +125,8 @@ resource "aws_cloudwatch_log_group" "lg_cfg" {
 resource "aws_ecs_cluster" "cluster" {
   name = "${local.name}-cluster"
 }
+
+# (Your EFS fs / mount targets are assumed to be defined elsewhere in this file)
 
 # Task definition with 4 containers sharing EFS volumes
 resource "aws_ecs_task_definition" "task" {
@@ -135,140 +142,204 @@ resource "aws_ecs_task_definition" "task" {
   volume {
     name = "config"
     efs_volume_configuration {
-      file_system_id = aws_efs_file_system.fs.id
-      transit_encryption = "ENABLED"
-      root_directory = "/config"
+      file_system_id       = aws_efs_file_system.fs.id
+      transit_encryption   = "ENABLED"
+      root_directory       = "/config"
     }
   }
+
   volume {
     name = "prom_data"
     efs_volume_configuration {
-      file_system_id = aws_efs_file_system.fs.id
-      transit_encryption = "ENABLED"
-      root_directory = "/prom-data"
+      file_system_id       = aws_efs_file_system.fs.id
+      transit_encryption   = "ENABLED"
+      root_directory       = "/prom-data"
     }
   }
+
   volume {
     name = "grafana_data"
     efs_volume_configuration {
-      file_system_id = aws_efs_file_system.fs.id
-      transit_encryption = "ENABLED"
-      root_directory = "/grafana-data"
+      file_system_id       = aws_efs_file_system.fs.id
+      transit_encryption   = "ENABLED"
+      root_directory       = "/grafana-data"
     }
   }
 
+  # ---------------- container_definitions (fixed) ----------------
   container_definitions = jsonencode([
-  {
-    name        = "config-sync"
-    image       = var.config_sync_image
-    essential   = false
-    entryPoint  = ["bash", "-lc"]
-
-    command = [
-      "/bin/sh",
-      "-c",
-      <<-EOC
-        yum -y install unzip gzip tar curl awscli &&
-        mkdir -p /config &&
-        aws s3 cp s3://${var.config_bucket}/prometheus.yml /config/prometheus.yml &&
-        aws s3 cp s3://${var.config_bucket}/alertmanager.yml /config/alertmanager.yml &&
-        aws s3 cp s3://${var.config_bucket}/grafana-dashboard.json /config/grafana-dashboard.json &&
-        echo 'config ready'; sleep 5m
-      EOC
-    ]
-
-        mountPoints = [
-      {
-        sourceVolume  = "config"
-        containerPath = "/config"
-      }
-    ]
-
-    "logConfiguration" = {
-      "logDriver" = "awslogs",
-      "options" = {
-        "awslogs-group"         = aws_cloudwatch_log_group.lg_cfg.name,
-        "awslogs-region"        = data.aws_region.current.name,
-        "awslogs-stream-prefix" = "ecs"
-      }
-    }
-  }
-])
-
-      "mountPoints": [{"sourceVolume":"config","containerPath":"/config"}],
-      "logConfiguration": {"logDriver":"awslogs","options":{
-        "awslogs-group": aws_cloudwatch_log_group.lg_cfg.name,
-        "awslogs-region": "${data.aws_region.current.name}",
-        "awslogs-stream-prefix": "ecs"}}
-    },
+    # 1) Config-sync sidecar
     {
-      "name": "prometheus",
-      "image": var.prometheus_image,
-      "essential": true,
-      "portMappings": [{"containerPort":9090,"protocol":"tcp"}],
-      "entryPoint": ["sh","-lc"],
+      name       = "config-sync"
+      image      = var.config_sync_image
+      essential  = false
+      entryPoint = ["bash", "-lc"]
+
       command = [
-      "/bin/sh",
-      "-c",
-      <<-PROM
-        while [ ! -f /config/prometheus.yml ]; do echo 'wait cfg'; sleep 2; done;
-        exec /bin/prometheus \
-          --config.file=/config/prometheus.yml \
-          --storage.tsdb.path=/prom-data \
-          --web.enable-admin-api \
-          --web.enable-lifecycle
-      PROM
-    ]
+        "/bin/sh",
+        "-c",
+        <<-EOC
+          yum -y install unzip gzip tar curl awscli &&
+          mkdir -p /config &&
+          aws s3 cp s3://${var.config_bucket}/prometheus.yml /config/prometheus.yml &&
+          aws s3 cp s3://${var.config_bucket}/alertmanager.yml /config/alertmanager.yml &&
+          aws s3 cp s3://${var.config_bucket}/grafana-dashboard.json /config/grafana-dashboard.json &&
+          echo 'config ready'; sleep 5m
+        EOC
+      ]
 
-      "mountPoints": [
-        {"sourceVolume":"config","containerPath":"/config"},
-        {"sourceVolume":"prom_data","containerPath":"/prom-data"}
-      ],
-      "logConfiguration": {"logDriver":"awslogs","options":{
-        "awslogs-group": aws_cloudwatch_log_group.lg_prom.name,
-        "awslogs-region": "${data.aws_region.current.name}",
-        "awslogs-stream-prefix": "ecs"}}
-    },
-    {
-      "name": "alertmanager",
-      "image": var.alertmanager_image,
-      "essential": true,
-      "portMappings": [{"containerPort":9093,"protocol":"tcp"}],
-      "entryPoint": ["sh","-lc"],
-         command = [
-      "/bin/sh",
-      "-c",
-      <<-ALERT
-        while [ ! -f /config/alertmanager.yml ]; do echo 'wait cfg'; sleep 2; done;
-        exec /bin/alertmanager \
-          --config.file=/config/alertmanager.yml \
-          --storage.path=/alert-data
-      ALERT
-    ]
+      mountPoints = [
+        {
+          sourceVolume  = "config"
+          containerPath = "/config"
+        }
+      ]
 
-      "mountPoints": [{"sourceVolume":"config","containerPath":"/config"}],
-      "logConfiguration": {"logDriver":"awslogs","options":{
-        "awslogs-group": aws_cloudwatch_log_group.lg_alert.name,
-        "awslogs-region": "${data.aws_region.current.name}",
-        "awslogs-stream-prefix": "ecs"}}
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.lg_cfg.name
+          awslogs-region        = data.aws_region.current.name
+          awslogs-stream-prefix = "ecs"
+        }
+      }
     },
+
+    # 2) Prometheus
     {
-      "name": "grafana",
-      "image": var.grafana_image,
-      "essential": true,
-      "portMappings": [{"containerPort":3000,"protocol":"tcp"}],
-      "environment": [
-        {"name":"GF_SECURITY_ADMIN_USER","value":"admin"},
-        {"name":"GF_SECURITY_ADMIN_PASSWORD","value":"admin"}
-      ],
-      "mountPoints": [
-        {"sourceVolume":"config","containerPath":"/config"},
-        {"sourceVolume":"grafana_data","containerPath":"/var/lib/grafana"}
-      ],
-      "logConfiguration": {"logDriver":"awslogs","options":{
-        "awslogs-group": aws_cloudwatch_log_group.lg_graf.name,
-        "awslogs-region": "${data.aws_region.current.name}",
-        "awslogs-stream-prefix": "ecs"}}
+      name      = "prometheus"
+      image     = var.prometheus_image
+      essential = true
+
+      portMappings = [
+        {
+          containerPort = 9090
+          protocol      = "tcp"
+        }
+      ]
+
+      entryPoint = ["sh", "-lc"]
+
+      command = [
+        "/bin/sh",
+        "-c",
+        <<-PROM
+          while [ ! -f /config/prometheus.yml ]; do echo 'wait cfg'; sleep 2; done;
+          exec /bin/prometheus \
+            --config.file=/config/prometheus.yml \
+            --storage.tsdb.path=/prom-data \
+            --web.enable-admin-api \
+            --web.enable-lifecycle
+        PROM
+      ]
+
+      mountPoints = [
+        {
+          sourceVolume  = "config"
+          containerPath = "/config"
+        },
+        {
+          sourceVolume  = "prom_data"
+          containerPath = "/prom-data"
+        }
+      ]
+
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.lg_prom.name
+          awslogs-region        = data.aws_region.current.name
+          awslogs-stream-prefix = "ecs"
+        }
+      }
+    },
+
+    # 3) Alertmanager
+    {
+      name      = "alertmanager"
+      image     = var.alertmanager_image
+      essential = true
+
+      portMappings = [
+        {
+          containerPort = 9093
+          protocol      = "tcp"
+        }
+      ]
+
+      entryPoint = ["sh", "-lc"]
+
+      command = [
+        "/bin/sh",
+        "-c",
+        <<-ALERT
+          while [ ! -f /config/alertmanager.yml ]; do echo 'wait cfg'; sleep 2; done;
+          exec /bin/alertmanager \
+            --config.file=/config/alertmanager.yml \
+            --storage.path=/alert-data
+        ALERT
+      ]
+
+      mountPoints = [
+        {
+          sourceVolume  = "config"
+          containerPath = "/config"
+        }
+      ]
+
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.lg_alert.name
+          awslogs-region        = data.aws_region.current.name
+          awslogs-stream-prefix = "ecs"
+        }
+      }
+    },
+
+    # 4) Grafana
+    {
+      name      = "grafana"
+      image     = var.grafana_image
+      essential = true
+
+      portMappings = [
+        {
+          containerPort = 3000
+          protocol      = "tcp"
+        }
+      ]
+
+      environment = [
+        {
+          name  = "GF_SECURITY_ADMIN_USER"
+          value = "admin"
+        },
+        {
+          name  = "GF_SECURITY_ADMIN_PASSWORD"
+          value = "admin"
+        }
+      ]
+
+      mountPoints = [
+        {
+          sourceVolume  = "config"
+          containerPath = "/config"
+        },
+        {
+          sourceVolume  = "grafana_data"
+          containerPath = "/var/lib/grafana"
+        }
+      ]
+
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.lg_graf.name
+          awslogs-region        = data.aws_region.current.name
+          awslogs-stream-prefix = "ecs"
+        }
+      }
     }
   ])
 }
@@ -284,10 +355,13 @@ resource "aws_ecs_service" "svc" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets         = var.public_subnet_ids
+    subnets          = var.public_subnet_ids
     assign_public_ip = true
-    security_groups = [aws_security_group.svc.id]
+    security_groups  = [aws_security_group.svc.id]
   }
 
-  lifecycle { ignore_changes = [task_definition] } # easier updates via new revision
+  # easier updates via new task definition revision
+  lifecycle {
+    ignore_changes = [task_definition]
+  }
 }
