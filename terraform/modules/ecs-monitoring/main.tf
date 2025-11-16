@@ -197,7 +197,7 @@ resource "aws_ecs_task_definition" "task" {
         logDriver = "awslogs"
         options = {
           awslogs-group         = aws_cloudwatch_log_group.lg_cfg.name
-          awslogs-region        = data.aws_region.current.name
+          awslogs-region        = data.aws_region.current.id
           awslogs-stream-prefix = "ecs"
         }
       }
@@ -246,7 +246,7 @@ resource "aws_ecs_task_definition" "task" {
         logDriver = "awslogs"
         options = {
           awslogs-group         = aws_cloudwatch_log_group.lg_prom.name
-          awslogs-region        = data.aws_region.current.name
+          awslogs-region        = data.aws_region.current.id
           awslogs-stream-prefix = "ecs"
         }
       }
@@ -289,7 +289,7 @@ resource "aws_ecs_task_definition" "task" {
         logDriver = "awslogs"
         options = {
           awslogs-group         = aws_cloudwatch_log_group.lg_alert.name
-          awslogs-region        = data.aws_region.current.name
+          awslogs-region        = data.aws_region.current.id
           awslogs-stream-prefix = "ecs"
         }
       }
@@ -334,7 +334,7 @@ resource "aws_ecs_task_definition" "task" {
         logDriver = "awslogs"
         options = {
           awslogs-group         = aws_cloudwatch_log_group.lg_graf.name
-          awslogs-region        = data.aws_region.current.name
+          awslogs-region        = data.aws_region.current.id
           awslogs-stream-prefix = "ecs"
         }
       }
