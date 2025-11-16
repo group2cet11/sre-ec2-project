@@ -9,30 +9,41 @@ resource "aws_security_group" "svc" {
   vpc_id      = var.vpc_id
 
   # Prometheus
-  ingress { from_port = 9090 to_port = 9090 protocol = "tcp" cidr_blocks = var.allowed_cidrs }
+  ingress {
+    from_port   = 9090
+    to_port     = 9090
+    protocol    = "tcp"
+    cidr_blocks = var.allowed_cidrs
+  }
+
   # Alertmanager
-  ingress { from_port = 9093 to_port = 9093 protocol = "tcp" cidr_blocks = var.allowed_cidrs }
+  ingress {
+    from_port   = 9093
+    to_port     = 9093
+    protocol    = "tcp"
+    cidr_blocks = var.allowed_cidrs
+  }
+
   # Grafana
-  ingress { from_port = 3000 to_port = 3000 protocol = "tcp" cidr_blocks = var.allowed_cidrs }
+  ingress {
+    from_port   = 3000
+    to_port     = 3000
+    protocol    = "tcp"
+    cidr_blocks = var.allowed_cidrs
+  }
 
-  egress  { from_port = 0 to_port = 0 protocol = "-1" cidr_blocks = ["0.0.0.0/0"] }
-  tags = { Name = "${local.name}-sg" }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${local.name}-sg"
+  }
 }
 
-# EFS for /prom-data, /grafana-data, /config
-resource "aws_efs_file_system" "fs" {
-  encrypted = true
-  throughput_mode = var.efs_throughput_mode
-  tags = { Name = "${local.name}-efs" }
-}
-
-# One mount target per subnet
-resource "aws_efs_mount_target" "mt" {
-  for_each       = toset(var.public_subnet_ids)
-  file_system_id = aws_efs_file_system.fs.id
-  subnet_id      = each.value
-  security_groups = [aws_security_group.svc.id]
-}
 
 # ---------- IAM ----------
 # Task execution role (pull images, write logs)
@@ -40,10 +51,18 @@ resource "aws_iam_role" "exec" {
   name = "${local.name}-exec"
   assume_role_policy = data.aws_iam_policy_document.exec_assume.json
 }
+
 data "aws_iam_policy_document" "exec_assume" {
-  statement { actions = ["sts:AssumeRole"]
-    principals { type = "Service" identifiers = ["ecs-tasks.amazonaws.com"] } }
+  statement {
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["ecs-tasks.amazonaws.com"]
+    }
+  }
 }
+
 resource "aws_iam_role_policy_attachment" "exec_attach" {
   role       = aws_iam_role.exec.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
