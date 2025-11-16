@@ -158,19 +158,43 @@ resource "aws_ecs_task_definition" "task" {
   }
 
   container_definitions = jsonencode([
-    {
-      "name": "config-sync",
-      "image": var.config_sync_image,
-      "essential": false,
-      "entryPoint": ["bash","-lc"],
-      "command": [
-        "yum -y install unzip gzip tar curl awscli && \
-         mkdir -p /config && \
-         aws s3 cp s3://${var.config_bucket}/prometheus.yml /config/prometheus.yml && \
-         aws s3 cp s3://${var.config_bucket}/alertmanager.yml /config/alertmanager.yml && \
-         aws s3 cp s3://${var.config_bucket}/grafana-dashboard.json /config/grafana-dashboard.json && \
-         echo 'config ready'; sleep 5m"
-      ],
+  {
+    "name"        = "config-sync",
+    "image"       = var.config_sync_image,
+    "essential"   = false,
+    "entryPoint"  = ["bash", "-lc"],
+
+    "command" = [
+      "/bin/sh",
+      "-c",
+      <<-EOC
+        yum -y install unzip gzip tar curl awscli &&
+        mkdir -p /config &&
+        aws s3 cp s3://${var.config_bucket}/prometheus.yml /config/prometheus.yml &&
+        aws s3 cp s3://${var.config_bucket}/alertmanager.yml /config/alertmanager.yml &&
+        aws s3 cp s3://${var.config_bucket}/grafana-dashboard.json /config/grafana-dashboard.json &&
+        echo 'config ready'; sleep 5m
+      EOC
+    ],
+
+    "mountPoints" = [
+      {
+        "sourceVolume"  = "config",
+        "containerPath" = "/config"
+      }
+    ],
+
+    "logConfiguration" = {
+      "logDriver" = "awslogs",
+      "options" = {
+        "awslogs-group"         = aws_cloudwatch_log_group.lg_cfg.name,
+        "awslogs-region"        = data.aws_region.current.name,
+        "awslogs-stream-prefix" = "ecs"
+      }
+    }
+  }
+])
+
       "mountPoints": [{"sourceVolume":"config","containerPath":"/config"}],
       "logConfiguration": {"logDriver":"awslogs","options":{
         "awslogs-group": aws_cloudwatch_log_group.lg_cfg.name,
