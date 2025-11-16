@@ -159,12 +159,12 @@ resource "aws_ecs_task_definition" "task" {
 
   container_definitions = jsonencode([
   {
-    "name"        = "config-sync",
-    "image"       = var.config_sync_image,
-    "essential"   = false,
-    "entryPoint"  = ["bash", "-lc"],
+    name        = "config-sync"
+    image       = var.config_sync_image
+    essential   = false
+    entryPoint  = ["bash", "-lc"]
 
-    "command" = [
+    command = [
       "/bin/sh",
       "-c",
       <<-EOC
@@ -175,14 +175,14 @@ resource "aws_ecs_task_definition" "task" {
         aws s3 cp s3://${var.config_bucket}/grafana-dashboard.json /config/grafana-dashboard.json &&
         echo 'config ready'; sleep 5m
       EOC
-    ],
+    ]
 
-    "mountPoints" = [
+        mountPoints = [
       {
-        "sourceVolume"  = "config",
-        "containerPath" = "/config"
+        sourceVolume  = "config"
+        containerPath = "/config"
       }
-    ],
+    ]
 
     "logConfiguration" = {
       "logDriver" = "awslogs",
@@ -207,14 +207,19 @@ resource "aws_ecs_task_definition" "task" {
       "essential": true,
       "portMappings": [{"containerPort":9090,"protocol":"tcp"}],
       "entryPoint": ["sh","-lc"],
-      "command": [
-        "while [ ! -f /config/prometheus.yml ]; do echo 'wait cfg'; sleep 2; done; \
-         exec /bin/prometheus \
-           --config.file=/config/prometheus.yml \
-           --storage.tsdb.path=/prom-data \
-           --web.enable-admin-api \
-           --web.enable-lifecycle"
-      ],
+      command = [
+      "/bin/sh",
+      "-c",
+      <<-PROM
+        while [ ! -f /config/prometheus.yml ]; do echo 'wait cfg'; sleep 2; done;
+        exec /bin/prometheus \
+          --config.file=/config/prometheus.yml \
+          --storage.tsdb.path=/prom-data \
+          --web.enable-admin-api \
+          --web.enable-lifecycle
+      PROM
+    ]
+
       "mountPoints": [
         {"sourceVolume":"config","containerPath":"/config"},
         {"sourceVolume":"prom_data","containerPath":"/prom-data"}
@@ -230,12 +235,17 @@ resource "aws_ecs_task_definition" "task" {
       "essential": true,
       "portMappings": [{"containerPort":9093,"protocol":"tcp"}],
       "entryPoint": ["sh","-lc"],
-      "command": [
-        "while [ ! -f /config/alertmanager.yml ]; do echo 'wait cfg'; sleep 2; done; \
-         exec /bin/alertmanager \
-           --config.file=/config/alertmanager.yml \
-           --storage.path=/alert-data"
-      ],
+         command = [
+      "/bin/sh",
+      "-c",
+      <<-ALERT
+        while [ ! -f /config/alertmanager.yml ]; do echo 'wait cfg'; sleep 2; done;
+        exec /bin/alertmanager \
+          --config.file=/config/alertmanager.yml \
+          --storage.path=/alert-data
+      ALERT
+    ]
+
       "mountPoints": [{"sourceVolume":"config","containerPath":"/config"}],
       "logConfiguration": {"logDriver":"awslogs","options":{
         "awslogs-group": aws_cloudwatch_log_group.lg_alert.name,
