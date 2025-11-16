@@ -2,7 +2,7 @@ locals {
   name = "sre-${var.environment}-mon"
 }
 
-# ---------- Security Groups ----------
+# ---------- Security Group for ECS tasks ----------
 resource "aws_security_group" "svc" {
   name        = "${local.name}-sg"
   description = "Monitoring ECS SG"
@@ -121,6 +121,52 @@ resource "aws_cloudwatch_log_group" "lg_cfg" {
   retention_in_days = 7
 }
 
+# ---------- Region data ----------
+data "aws_region" "current" {}
+
+# ---------- EFS for Prometheus / Grafana / config ----------
+# SG for EFS: allow NFS from ECS SG
+resource "aws_security_group" "efs" {
+  name        = "${local.name}-efs-sg"
+  description = "EFS SG for monitoring stack"
+  vpc_id      = var.vpc_id
+
+  ingress {
+    from_port       = 2049
+    to_port         = 2049
+    protocol        = "tcp"
+    security_groups = [aws_security_group.svc.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${local.name}-efs-sg"
+  }
+}
+
+resource "aws_efs_file_system" "fs" {
+  encrypted        = true
+  throughput_mode  = var.efs_throughput_mode
+  performance_mode = "generalPurpose"
+
+  tags = {
+    Name = "${local.name}-efs"
+  }
+}
+
+resource "aws_efs_mount_target" "mt" {
+  for_each        = toset(var.public_subnet_ids)
+  file_system_id  = aws_efs_file_system.fs.id
+  subnet_id       = each.value
+  security_groups = [aws_security_group.efs.id]
+}
+
 # ---------- ECS ----------
 resource "aws_ecs_cluster" "cluster" {
   name = "${local.name}-cluster"
@@ -140,31 +186,31 @@ resource "aws_ecs_task_definition" "task" {
   volume {
     name = "config"
     efs_volume_configuration {
-      file_system_id       = aws_efs_file_system.fs.id
-      transit_encryption   = "ENABLED"
-      root_directory       = "/config"
+      file_system_id     = aws_efs_file_system.fs.id
+      transit_encryption = "ENABLED"
+      root_directory     = "/config"
     }
   }
 
   volume {
     name = "prom_data"
     efs_volume_configuration {
-      file_system_id       = aws_efs_file_system.fs.id
-      transit_encryption   = "ENABLED"
-      root_directory       = "/prom-data"
+      file_system_id     = aws_efs_file_system.fs.id
+      transit_encryption = "ENABLED"
+      root_directory     = "/prom-data"
     }
   }
 
   volume {
     name = "grafana_data"
     efs_volume_configuration {
-      file_system_id       = aws_efs_file_system.fs.id
-      transit_encryption   = "ENABLED"
-      root_directory       = "/grafana-data"
+      file_system_id     = aws_efs_file_system.fs.id
+      transit_encryption = "ENABLED"
+      root_directory     = "/grafana-data"
     }
   }
 
-  # ---------------- container_definitions (fixed) ----------------
+  # ---------------- container_definitions ----------------
   container_definitions = jsonencode([
     # 1) Config-sync sidecar
     {
@@ -342,9 +388,7 @@ resource "aws_ecs_task_definition" "task" {
   ])
 }
 
-data "aws_region" "current" {}
-
-# The ECS service (single task with all 4 containers)
+# ---------- ECS Service ----------
 resource "aws_ecs_service" "svc" {
   name            = "${local.name}-svc"
   cluster         = aws_ecs_cluster.cluster.id
