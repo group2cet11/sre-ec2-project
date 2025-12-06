@@ -18,12 +18,11 @@ module "network" {
 # Compute
 module "compute" {
   source         = "./modules/compute"
-  subnet_id      = module.network.public_subnet_id
+  subnet_id      = module.network.public_subnet_ids[0]   # <--- UPDATED
   vpc_id         = module.network.vpc_id
   instance_type  = var.instance_type
   ami_id         = var.ami_id
   environment    = var.environment
-  # pass through the revision switch
   userdata_revision = var.userdata_revision
 }
 
@@ -60,7 +59,7 @@ module "ecs_monitoring" {
 
   environment       = var.environment
   vpc_id            = module.network.vpc_id
-  public_subnet_ids = [module.network.public_subnet_id]
+  public_subnet_ids = module.network.public_subnet_ids
 
   # Who can access Grafana/Prometheus
   allowed_cidrs = ["0.0.0.0/0"]
