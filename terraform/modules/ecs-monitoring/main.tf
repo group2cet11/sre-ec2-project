@@ -161,7 +161,10 @@ resource "aws_efs_file_system" "fs" {
 }
 
 resource "aws_efs_mount_target" "mt" {
-  for_each        = toset(var.public_subnet_ids)
+  for_each = {
+  for idx, subnet_id in var.public_subnet_ids :
+  idx => subnet_id
+}
   file_system_id  = aws_efs_file_system.fs.id
   subnet_id       = each.value
   security_groups = [aws_security_group.efs.id]
@@ -407,3 +410,4 @@ resource "aws_ecs_service" "svc" {
     ignore_changes = [task_definition]
   }
 }
+
