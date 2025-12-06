@@ -1,5 +1,12 @@
 terraform {
-  backend "s3" {} # values supplied via backend.<env>.tfvars
+  required_version = ">= 1.5.0"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 6.0"
+    }
+  }
 }
 
 data "aws_caller_identity" "current" {}
@@ -67,4 +74,5 @@ module "ecs_monitoring" {
   # S3 that stores yaml/json config files
   config_bucket = aws_s3_bucket.mon_config.bucket
 }
+
 
