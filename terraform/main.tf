@@ -31,6 +31,8 @@ module "compute" {
   ami_id         = var.ami_id
   environment    = var.environment
   userdata_revision = var.userdata_revision
+# NEW SSH KEY
+  key_name        = var.key_name 
 }
 
 # Monitoring (minimal CW Log Group)

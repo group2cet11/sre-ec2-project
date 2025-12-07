@@ -1,8 +1,5 @@
-environment = "uat"
-
-vpc_cidr         = "10.1.0.0/16"
-public_subnet_a  = "10.1.1.0/24"
-public_subnet_b  = "10.1.2.0/24"
-
+environment       = "uat"
+region            = "us-east-1"
 instance_type     = "t3.micro"
 userdata_revision = 2
+key_name = "dave-key"

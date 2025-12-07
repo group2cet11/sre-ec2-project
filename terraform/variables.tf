@@ -27,3 +27,8 @@ variable "userdata_revision" {
   type        = number
   default     = 1
 }
+
+variable "key_name" {
+  type        = string
+  description = "SSH key pair name for the EC2 instance"
+}

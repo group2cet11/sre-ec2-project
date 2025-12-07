@@ -7,6 +7,8 @@ variable "instance_type" { type = string }
 variable "ami_id"        { type = string }
 variable "environment"   { type = string }
 variable "userdata_revision" { type = number }
+variable "key_name" { type = string }
+
 ############################################
 # security group
 ############################################
@@ -14,6 +16,7 @@ resource "aws_security_group" "web_sg" {
   vpc_id = var.vpc_id
   name   = "sre-${var.environment}-web-sg"
 
+  # HTTP
   ingress {
     description = "HTTP"
     from_port   = 80
@@ -22,6 +25,7 @@ resource "aws_security_group" "web_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # SSH
   ingress {
     description = "SSH"
     from_port   = 22
@@ -30,6 +34,7 @@ resource "aws_security_group" "web_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # outbound
   egress {
     from_port   = 0
     to_port     = 0
@@ -51,19 +56,19 @@ resource "aws_instance" "web" {
   subnet_id              = var.subnet_id
   vpc_security_group_ids = [aws_security_group.web_sg.id]
 
-  # 👇 Ensure a new instance is created whenever user_data changes
+  # NEW: SSH key pair
+  key_name = var.key_name
+
   user_data_replace_on_change = true
 
   user_data = <<EOF
 #!/bin/bash
 # user-data revision: ${var.userdata_revision}
-# Log everything for troubleshooting
 exec > >(tee -a /var/log/user-data.log) 2>&1
 
 dnf update -y
 dnf install -y nginx python3 python3-pip || true
 
-# --- Put our index page so the welcome page is replaced immediately ---
 mkdir -p /usr/share/nginx/html
 cat << 'INDEX' > /usr/share/nginx/html/index.html
 <!doctype html>
@@ -77,7 +82,6 @@ cat << 'INDEX' > /usr/share/nginx/html/index.html
 </html>
 INDEX
 
-# --- Nginx reverse proxy for /api -> Flask on 127.0.0.1:8080 ---
 mkdir -p /etc/nginx/conf.d
 cat << 'CONF' > /etc/nginx/conf.d/app.conf
 server {
@@ -88,6 +92,12 @@ server {
   root /usr/share/nginx/html;
   index index.html;
 
+  # FIX: Handle /api (no slash) → redirect to /api/
+  location /api {
+    return 301 /api/;
+  }
+
+  # Main Flask proxy
   location /api/ {
     proxy_pass         http://127.0.0.1:8080/;
     proxy_http_version 1.1;
@@ -104,7 +114,6 @@ CONF
 systemctl enable nginx
 systemctl restart nginx
 
-# --- Flask API on 127.0.0.1:8080 ---
 mkdir -p /opt/app
 cat << 'APP' > /opt/app/app.py
 from flask import Flask, jsonify
@@ -147,15 +156,15 @@ systemctl daemon-reload
 systemctl enable flask
 systemctl restart flask || systemctl start flask
 
-# Show status to the log
 systemctl status nginx --no-pager || true
 systemctl status flask --no-pager || true
 EOF
 
   tags = { Name = "sre-${var.environment}-ec2" }
 }
+
 ############################################
-# outputs (returned to root module)
+# outputs
 ############################################
 output "public_ip" {
   value = aws_instance.web.public_ip
