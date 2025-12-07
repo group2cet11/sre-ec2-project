@@ -1,20 +1,17 @@
-name: Global Monitoring Deployment
+name: "Terraform Monitoring Deployment"
 
 on:
   push:
-    branches: ["main"]
-
-  workflow_dispatch:
-
-env:
-  AWS_REGION: us-east-1
+    branches:
+      - main
+    paths:
+      - "terraform/monitoring-global/**"
+      - ".github/workflows/terraform-monitoring.yml"
 
 jobs:
   terraform:
+    name: "Deploy Monitoring Stack"
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
 
     defaults:
       run:
@@ -24,19 +21,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::108471662249:role/GhaDeployRole
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Install Terraform
+      - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.8.5
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -backend-config=../backend/monitoring.tfbackend
+
+      - name: Terraform Validate
+        run: terraform validate
 
       - name: Terraform Plan
         run: terraform plan -out=tfplan
