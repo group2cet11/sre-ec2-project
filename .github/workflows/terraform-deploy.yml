@@ -1,4 +1,5 @@
 name: Terraform EC2 Deployment
+if: false
 
 on:
   push:
