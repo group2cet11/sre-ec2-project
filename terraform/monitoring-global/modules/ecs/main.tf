@@ -1,0 +1,182 @@
+#############################################
+# VARIABLES
+#############################################
+variable "cluster_name" {}
+variable "ecs_sg_id" {}
+variable "subnets" { type = list(string) }
+variable "prometheus_ap_id" {}
+variable "alb_prom_tg" {}
+variable "alb_graf_tg" {}
+variable "efs_id" {}
+
+#############################################
+# DATA SOURCES
+#############################################
+data "aws_ecs_cluster" "cluster" {
+  cluster_name = var.cluster_name
+}
+
+data "aws_iam_role" "ecs_exec" {
+  name = "monitoring-ecs-execution-role"
+}
+
+#############################################
+# ADD S3 PERMISSION TO ECS EXECUTION ROLE
+#############################################
+resource "aws_iam_role_policy" "ecs_exec_s3" {
+  name = "ecs-exec-s3-policy"
+  role = data.aws_iam_role.ecs_exec.name
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "s3:GetObject",
+          "s3:ListBucket"
+        ],
+        Resource = [
+          "arn:aws:s3:::sre-monitoring-config",
+          "arn:aws:s3:::sre-monitoring-config/*"
+        ]
+      }
+    ]
+  })
+}
+
+#############################################
+# PROMETHEUS TASK DEFINITION
+#############################################
+resource "aws_ecs_task_definition" "prom" {
+  family                   = "prometheus"
+  cpu                      = "256"
+  memory                   = "512"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+
+  execution_role_arn = data.aws_iam_role.ecs_exec.arn
+  task_role_arn      = data.aws_iam_role.ecs_exec.arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "prom"
+      image     = "prom/prometheus"
+      essential = true
+
+      command = [
+        "sh",
+        "-c",
+        "apk add --no-cache aws-cli && \
+         aws s3 cp s3://sre-monitoring-config/prometheus/prometheus.yml /prometheus/prometheus.yml && \
+         /bin/prometheus --config.file=/prometheus/prometheus.yml --storage.tsdb.path=/prometheus"
+      ]
+
+      portMappings = [{
+        containerPort = 9090
+      }]
+
+      mountPoints = [{
+        containerPath = "/prometheus"
+        sourceVolume  = "storage"
+      }]
+    }
+  ])
+
+  volume {
+    name = "storage"
+
+    efs_volume_configuration {
+      file_system_id     = var.efs_id
+      root_directory     = "/"
+      transit_encryption = "ENABLED"
+
+      authorization_config {
+        access_point_id = var.prometheus_ap_id
+        iam             = "ENABLED"
+      }
+    }
+  }
+}
+
+#############################################
+# GRAFANA TASK DEFINITION
+#############################################
+resource "aws_ecs_task_definition" "graf" {
+  family                   = "grafana"
+  cpu                      = "256"
+  memory                   = "512"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+
+  execution_role_arn = data.aws_iam_role.ecs_exec.arn
+  task_role_arn      = data.aws_iam_role.ecs_exec.arn
+
+  container_definitions = jsonencode([
+    {
+      name  = "grafana"
+      image = "grafana/grafana"
+
+      portMappings = [{
+        containerPort = 3000
+      }]
+    }
+  ])
+}
+
+#############################################
+# PROMETHEUS ECS SERVICE
+#############################################
+resource "aws_ecs_service" "prom" {
+  name            = "prometheus-service"
+  cluster         = data.aws_ecs_cluster.cluster.id
+  task_definition = aws_ecs_task_definition.prom.arn
+  launch_type     = "FARGATE"
+  desired_count   = 1
+
+  network_configuration {
+    subnets          = var.subnets
+    security_groups  = [var.ecs_sg_id]
+    assign_public_ip = true
+  }
+
+  load_balancer {
+    target_group_arn = var.alb_prom_tg
+    container_name   = "prom"
+    container_port   = 9090
+  }
+
+  depends_on = [aws_ecs_task_definition.prom]
+}
+
+#############################################
+# GRAFANA ECS SERVICE
+#############################################
+resource "aws_ecs_service" "graf" {
+  name            = "grafana-service"
+  cluster         = data.aws_ecs_cluster.cluster.id
+  task_definition = aws_ecs_task_definition.graf.arn
+  launch_type     = "FARGATE"
+  desired_count   = 1
+
+  network_configuration {
+    subnets          = var.subnets
+    security_groups  = [var.ecs_sg_id]
+    assign_public_ip = true
+  }
+
+  load_balancer {
+    target_group_arn = var.alb_graf_tg
+    container_name   = "grafana"
+    container_port   = 3000
+  }
+
+  depends_on = [aws_ecs_task_definition.graf]
+}
+
+#############################################
+# OUTPUTS
+#############################################
+output "ecs_cluster_name" {
+  value = data.aws_ecs_cluster.cluster.cluster_name
+}
