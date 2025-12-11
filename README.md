@@ -2,6 +2,10 @@
 
 This repo deploys a minimal SRE stack on **AWS EC2** using **Terraform**, with CI/CD via **GitHub Actions (OIDC)** and observability using **CloudWatch** plus optional **Prometheus + Grafana**.
 
+## Architecture Diagram
+
+![diagram](/diagrams/architecture.drawio.png)
+
 ## Accounts & Branch-to-Account Mapping
 - **Main (production deploy)** → Account **<ACCOUNT_ID_M3L>** (your `m3l415072023` daily-cleanup account)
 - **Other branches (sandbox/dev)** → Account **<ACCOUNT_ID_1084>** (course mate account `108471662249`) — optional
