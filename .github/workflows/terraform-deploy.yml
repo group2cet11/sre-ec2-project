@@ -18,7 +18,7 @@ env:
   ENV: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.env || 'dev' }}
 
 concurrency:
-  group: deploy-${{ env.ENV }}
+  group: deploy-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.env || 'dev' }}
   cancel-in-progress: false
 
 jobs:
