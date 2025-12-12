@@ -70,4 +70,5 @@ jobs:
           echo "## EC2 Deployment Successful" >> $GITHUB_STEP_SUMMARY
           echo "**Environment:** ${ENV}" >> $GITHUB_STEP_SUMMARY
           echo "**Public IP:** $IP" >> $GITHUB_STEP_SUMMARY
-          echo "[Open Website](http://$IP)" >> $GITHUB_STEP_SUMMARY
+          echo "[Open Website](http://$IP)" >> $GITHUB_STEP_SUMMARY 
+
