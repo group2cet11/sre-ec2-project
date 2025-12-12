@@ -1,0 +1,36 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # --------------------------------------------------------
+  # Scrape Prometheus itself
+  # --------------------------------------------------------
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # --------------------------------------------------------
+  # EC2 Auto-Discovery (Node Exporter on EC2)
+  # --------------------------------------------------------
+  - job_name: 'ec2-node-exporter'
+    ec2_sd_configs:
+      - region: us-east-1
+        port: 9100
+        filters:
+          - name: tag:Monitor
+            values: ["true"]
+
+    relabel_configs:
+      - source_labels: [__meta_ec2_private_ip]
+        target_label: instance_ip
+
+      - source_labels: [__meta_ec2_tag_Name]
+        target_label: instance_name
+
+      - source_labels: [__meta_ec2_tag_Environment]
+        target_label: environment
+
+      - regex: "(.*)"
+        replacement: "/metrics"
+        target_label: __metrics_path__

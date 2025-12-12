@@ -5,12 +5,12 @@ variable "cluster_name" {}
 variable "ecs_sg_id" {}
 variable "subnets" { type = list(string) }
 variable "prometheus_ap_id" {}
+variable "efs_id" {}
 variable "alb_prom_tg" {}
 variable "alb_graf_tg" {}
-variable "efs_id" {}
 
 #############################################
-# DATA SOURCES
+# LOOKUP CLUSTER + IAM ROLE
 #############################################
 data "aws_ecs_cluster" "cluster" {
   cluster_name = var.cluster_name
@@ -21,7 +21,7 @@ data "aws_iam_role" "ecs_exec" {
 }
 
 #############################################
-# ADD S3 PERMISSION TO ECS EXECUTION ROLE
+# IAM POLICY — Allow ECS task to read S3 config
 #############################################
 resource "aws_iam_role_policy" "ecs_exec_s3" {
   name = "ecs-exec-s3-policy"
@@ -60,16 +60,14 @@ resource "aws_ecs_task_definition" "prom" {
 
   container_definitions = jsonencode([
     {
-      name      = "prom"
+      name      = "prometheus"
       image     = "prom/prometheus"
       essential = true
 
+      # Run shell commands inside container
+      entryPoint = ["sh", "-c"]
       command = [
-        "sh",
-        "-c",
-        "apk add --no-cache aws-cli && \
-         aws s3 cp s3://sre-monitoring-config/prometheus/prometheus.yml /prometheus/prometheus.yml && \
-         /bin/prometheus --config.file=/prometheus/prometheus.yml --storage.tsdb.path=/prometheus"
+        "apk add --no-cache aws-cli && aws s3 cp s3://sre-monitoring-config/prometheus/prometheus.yml /prometheus/prometheus.yml && /bin/prometheus --config.file=/prometheus/prometheus.yml --storage.tsdb.path=/prometheus"
       ]
 
       portMappings = [{
@@ -127,12 +125,12 @@ resource "aws_ecs_task_definition" "graf" {
 #############################################
 # PROMETHEUS ECS SERVICE
 #############################################
-resource "aws_ecs_service" "prom" {
+resource "aws_ecs_service" "prometheus" {
   name            = "prometheus-service"
-  cluster         = data.aws_ecs_cluster.cluster.id
+  cluster         = data.aws_ecs_cluster.cluster.cluster_name
   task_definition = aws_ecs_task_definition.prom.arn
-  launch_type     = "FARGATE"
   desired_count   = 1
+  launch_type     = "FARGATE"
 
   network_configuration {
     subnets          = var.subnets
@@ -142,22 +140,24 @@ resource "aws_ecs_service" "prom" {
 
   load_balancer {
     target_group_arn = var.alb_prom_tg
-    container_name   = "prom"
+    container_name   = "prometheus"
     container_port   = 9090
   }
 
-  depends_on = [aws_ecs_task_definition.prom]
+  depends_on = [
+    aws_ecs_task_definition.prom
+  ]
 }
 
-#############################################
+###############################################
 # GRAFANA ECS SERVICE
-#############################################
-resource "aws_ecs_service" "graf" {
+###############################################
+resource "aws_ecs_service" "grafana" {
   name            = "grafana-service"
-  cluster         = data.aws_ecs_cluster.cluster.id
+  cluster         = data.aws_ecs_cluster.cluster.cluster_name
   task_definition = aws_ecs_task_definition.graf.arn
-  launch_type     = "FARGATE"
   desired_count   = 1
+  launch_type     = "FARGATE"
 
   network_configuration {
     subnets          = var.subnets
@@ -171,7 +171,9 @@ resource "aws_ecs_service" "graf" {
     container_port   = 3000
   }
 
-  depends_on = [aws_ecs_task_definition.graf]
+  depends_on = [
+    aws_ecs_task_definition.graf
+  ]
 }
 
 #############################################
