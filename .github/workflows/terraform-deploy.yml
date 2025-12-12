@@ -1,5 +1,4 @@
 name: Terraform EC2 Deployment
-if: false
 
 on:
   push:
@@ -19,7 +18,7 @@ env:
   ENV: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.env || 'dev' }}
 
 concurrency:
-  group: deploy-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.env || 'dev' }}
+  group: deploy-${{ env.ENV }}
   cancel-in-progress: false
 
 jobs:
@@ -70,5 +69,4 @@ jobs:
           echo "## EC2 Deployment Successful" >> $GITHUB_STEP_SUMMARY
           echo "**Environment:** ${ENV}" >> $GITHUB_STEP_SUMMARY
           echo "**Public IP:** $IP" >> $GITHUB_STEP_SUMMARY
-          echo "[Open Website](http://$IP)" >> $GITHUB_STEP_SUMMARY 
-
+          echo "[Open Website](http://$IP)" >> $GITHUB_STEP_SUMMARY
