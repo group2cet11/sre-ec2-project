@@ -20,6 +20,7 @@ module "network" {
   source      = "./modules/network"
   region      = var.region
   environment = var.environment
+  name_prefix = "${var.project}-${var.environment}"
 }
 
 # -------------------------------
@@ -34,14 +35,14 @@ module "compute" {
   key_name          = var.key_name
   environment       = var.environment
   userdata_revision = var.userdata_revision
+  name_prefix       = "${var.project}-${var.environment}"
 }
 
 # -------------------------------
-# CLOUDWATCH (OPTIONAL)
+# MONITORING MODULE
 # -------------------------------
 module "monitoring" {
   source      = "./modules/monitoring"
   environment = var.environment
+  name_prefix = "${var.project}-${var.environment}"
 }
-
-

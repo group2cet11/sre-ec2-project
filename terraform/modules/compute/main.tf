@@ -1,7 +1,3 @@
-locals {
-  name_prefix = "sre-${var.environment}"
-}
-
 resource "aws_security_group" "ec2_sg" {
   vpc_id = var.vpc_id
 
@@ -29,7 +25,7 @@ resource "aws_security_group" "ec2_sg" {
   }
 
   tags = {
-    Name = "${locals.name_prefix}-ec2-sg"
+    Name = "${var.name_prefix}-ec2-sg"
   }
 }
 
@@ -46,7 +42,7 @@ echo "Hello SRE World!" > /var/www/html/index.html
 EOF
 
   tags = {
-    Name = "${locals.name_prefix}-ec2"
+    Name = "${var.name_prefix}-ec2"
   }
 }
 

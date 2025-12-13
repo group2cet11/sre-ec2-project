@@ -1,4 +1,4 @@
-bucket         = "sre-tf-backend-prod-108471662249"
+bucket         = "sre-terraform-state"
 key            = "ec2/prod/terraform.tfstate"
 region         = "us-east-1"
 dynamodb_table = "terraform-locks"

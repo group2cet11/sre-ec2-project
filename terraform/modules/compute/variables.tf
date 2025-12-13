@@ -5,4 +5,4 @@ variable "ami_id"           { type = string }
 variable "environment"      { type = string }
 variable "key_name"         { type = string }
 variable "userdata_revision" { type = number }
-
+variable "name_prefix"      { type = string}
