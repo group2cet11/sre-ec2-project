@@ -1,4 +1,4 @@
-name: Terraform EC2 Deploy
+name: Terraform EC2 Deployment
 
 on:
   workflow_dispatch:
@@ -22,7 +22,6 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     defaults:
       run:
         working-directory: terraform
@@ -36,7 +35,7 @@ jobs:
 
       - name: Debug selected environment
         run: |
-          echo "Deploying environment: $TF_ENV"
+          echo "Deploying environment: ${{ env.TF_ENV }}"
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -50,15 +49,14 @@ jobs:
           terraform_version: 1.8.5
 
       - name: Terraform Init
-        run: terraform init -input=false -backend-config="backend/${TF_ENV}.tfbackend"
+        run: terraform init -input=false -backend-config="backend/${{ env.TF_ENV }}.tfbackend"
 
       - name: Terraform Validate
         run: terraform validate
 
       - name: Terraform Plan
-        run: terraform plan -var-file=envs/${TF_ENV}.tfvars -out=tfplan
+        run: terraform plan -var-file="envs/${{ env.TF_ENV }}.tfvars" -out=tfplan
 
-      # Manual approval BEFORE PROD deployment
       - name: Manual Approval Before Prod Deploy
         if: ${{ env.TF_ENV == 'prod' }}
         uses: trstringer/manual-approval@v1
@@ -68,23 +66,20 @@ jobs:
           minimum-approvals: 1
           issue-title: "Approve PROD Deployment"
 
-      # Apply for dev/uat
       - name: Terraform Apply (non-prod)
         if: ${{ env.TF_ENV != 'prod' }}
         run: terraform apply -auto-approve tfplan
 
-      # Apply for prod after approval
       - name: Terraform Apply (prod)
         if: ${{ env.TF_ENV == 'prod' }}
         run: terraform apply -auto-approve tfplan
 
-      # Output for dev/uat
       - name: Output EC2 Public IP
         if: ${{ env.TF_ENV != 'prod' }}
         run: |
           IP=$(terraform output -json | jq -r '.public_ip.value')
           echo "EC2_IP=$IP" >> $GITHUB_ENV
           echo "## 🚀 EC2 Deployment Successful" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** $TF_ENV" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ env.TF_ENV }}" >> $GITHUB_STEP_SUMMARY
           echo "**Public IP:** $IP" >> $GITHUB_STEP_SUMMARY
           echo "[Open Website](http://$IP)" >> $GITHUB_STEP_SUMMARY
