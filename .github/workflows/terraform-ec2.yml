@@ -24,50 +24,50 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # -----------------------------
+      # CHECKOUT REPO
+      # -----------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set ENV from workflow input
+      # -----------------------------
+      # CAPTURE ENVIRONMENT SELECTION
+      # -----------------------------
+      - name: Set selected ENV
         run: echo "TF_ENV=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
 
       - name: Debug selected environment
-        run: echo "Selected ENV = $TF_ENV"
+        run: echo "Deploying environment: $TF_ENV"
 
+      # -----------------------------
+      # AWS AUTH VIA OIDC
+      # -----------------------------
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::108471662249:role/GhaDeployRole
           aws-region: ${{ env.AWS_REGION }}
 
+      # -----------------------------
+      # INSTALL TERRAFORM
+      # -----------------------------
       - name: Install Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.8.5
 
-      - name: Terraform Init (correct backend for environment)
+      # -----------------------------
+      # TERRAFORM INIT (USE CORRECT BACKEND)
+      # -----------------------------
+      - name: Terraform Init
+        working-directory: terraform
         run: terraform init -backend-config="backend/${TF_ENV}.tfbackend"
 
+      # -----------------------------
+      # VALIDATE
+      # -----------------------------
       - name: Terraform Validate
+        working-directory: terraform
         run: terraform validate
 
-      - name: Terraform Plan
-        run: terraform plan -var-file="envs/${TF_ENV}.tfvars" -out=tfplan
-
-      - name: Terraform Apply
-        if: ${{ github.event.inputs.environment != 'prod' }}
-        run: terraform apply -auto-approve tfplan
-
-      - name: Show EC2 Output
-        if: ${{ github.event.inputs.environment != 'prod' }}
-        run: |
-          PUBLIC_IP=$(terraform output -json | jq -r '.public_ip.value')
-          echo "## 🚀 EC2 Deployment Successful" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** $TF_ENV" >> $GITHUB_STEP_SUMMARY
-          echo "**Public IP:** $PUBLIC_IP" >> $GITHUB_STEP_SUMMARY
-          echo "[Open Website](http://$PUBLIC_IP)" >> $GITHUB_STEP_SUMMARY
-
-      - name: Warn for prod manual apply
-        if: ${{ github.event.inputs.environment == 'prod' }}
-        run: |
-          echo "## ⚠️ Production Deployment Not Auto-Applied" >> $GITHUB_STEP_SUMMARY
-          echo "Run 'terraform apply' manually from AWS CloudShell or local machine." >> $GITHUB_STEP_SUMMARY
+      # ----------------
