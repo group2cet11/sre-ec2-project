@@ -25,77 +25,59 @@ jobs:
 
     defaults:
       run:
-        working-directory: terraform   # root terraform folder
+        working-directory: terraform
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ---------------------------
-      # Determine ENV from dropdown
-      # ---------------------------
       - name: Set selected environment
         run: echo "TF_ENV=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
 
       - name: Debug selected environment
-        run: 'echo "Deploying environment: $TF_ENV"'
+        run: echo "Deploying environment: $TF_ENV"
 
-      # ---------------------------
-      # AWS Authentication (OIDC)
-      # ---------------------------
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::108471662249:role/GhaDeployRole
           aws-region: ${{ env.AWS_REGION }}
 
-      # ---------------------------
-      # Terraform Setup
-      # ---------------------------
       - name: Install Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.8.5
 
-      # ---------------------------
-      # Terraform Init
-      # ---------------------------
-      - name: Terraform Init (correct backend)
+      - name: Terraform Init
         run: terraform init -input=false -backend-config="backend/${TF_ENV}.tfbackend"
 
-      # ---------------------------
-      # Terraform Validate
-      # ---------------------------
       - name: Terraform Validate
         run: terraform validate
 
-      # ---------------------------
-      # Terraform Plan
-      # ---------------------------
       - name: Terraform Plan
         run: terraform plan -var-file=envs/${TF_ENV}.tfvars -out=tfplan
 
-      # ---------------------------
-      # Terraform Apply
-      # Protect PROD from auto-apply
-      # ---------------------------
+      # 🔐 Manual Approval Gate for PROD
+      - name: Manual Approval Before Prod Deploy
+        if: ${{ env.TF_ENV == 'prod' }}
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ github.TOKEN }}
+          approvers: group2cet11
+          minimum-approvals: 1
+          issue-title: "Approve PROD Deployment"
+
+      # 🚀 Apply for DEV/UAT
       - name: Terraform Apply (non-prod)
         if: ${{ env.TF_ENV != 'prod' }}
         run: terraform apply -auto-approve tfplan
 
-      - name: Terraform Apply Blocked for PROD
+      # 🚀 Apply for PROD after approval
+      - name: Terraform Apply (PROD)
         if: ${{ env.TF_ENV == 'prod' }}
-        run: |
-          echo "## ⚠️ Production NOT auto-applied" >> $GITHUB_STEP_SUMMARY
-          echo "Run manually from CloudShell or local machine:" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "terraform init -backend-config=backend/prod.tfbackend" >> $GITHUB_STEP_SUMMARY
-          echo "terraform apply -var-file=envs/prod.tfvars" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        run: terraform apply -auto-approve tfplan
 
-      # ---------------------------
-      # Output EC2 Public IP (dev/uat only)
-      # ---------------------------
+      # 🌐 Output IP for dev/uat
       - name: Output EC2 Public IP
         if: ${{ env.TF_ENV != 'prod' }}
         run: |
@@ -105,6 +87,3 @@ jobs:
           echo "**Environment:** $TF_ENV" >> $GITHUB_STEP_SUMMARY
           echo "**Public IP:** $IP" >> $GITHUB_STEP_SUMMARY
           echo "[Open Website](http://$IP)" >> $GITHUB_STEP_SUMMARY
-
-
-
