@@ -1,4 +1,4 @@
-name: Terraform EC2 Deployments
+name: Terraform EC2 Deploy
 
 on:
   workflow_dispatch:
@@ -35,7 +35,7 @@ jobs:
         run: echo "TF_ENV=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
 
       - name: Debug selected environment
-        run: 'echo "Deploying environment: $TF_ENV"'
+        run: echo "Deploying environment: $TF_ENV"
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -57,7 +57,7 @@ jobs:
       - name: Terraform Plan
         run: terraform plan -var-file=envs/${TF_ENV}.tfvars -out=tfplan
 
-      # 🔐 Manual Approval Gate for PROD
+      # Manual Approval BEFORE PROD apply
       - name: Manual Approval Before Prod Deploy
         if: ${{ env.TF_ENV == 'prod' }}
         uses: trstringer/manual-approval@v1
@@ -67,17 +67,17 @@ jobs:
           minimum-approvals: 1
           issue-title: "Approve PROD Deployment"
 
-      # 🚀 Apply for DEV/UAT
+      # Apply for dev/uat
       - name: Terraform Apply (non-prod)
         if: ${{ env.TF_ENV != 'prod' }}
         run: terraform apply -auto-approve tfplan
 
-      # 🚀 Apply for PROD after approval
-      - name: Terraform Apply (PROD)
+      # Apply after approval for prod
+      - name: Terraform Apply (prod)
         if: ${{ env.TF_ENV == 'prod' }}
         run: terraform apply -auto-approve tfplan
 
-      # 🌐 Output IP for dev/uat
+      # Output for dev/uat
       - name: Output EC2 Public IP
         if: ${{ env.TF_ENV != 'prod' }}
         run: |
@@ -87,6 +87,3 @@ jobs:
           echo "**Environment:** $TF_ENV" >> $GITHUB_STEP_SUMMARY
           echo "**Public IP:** $IP" >> $GITHUB_STEP_SUMMARY
           echo "[Open Website](http://$IP)" >> $GITHUB_STEP_SUMMARY
-
-
-
