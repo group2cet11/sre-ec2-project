@@ -44,5 +44,5 @@ module "compute" {
 module "monitoring" {
   source      = "./modules/monitoring"
   environment = var.environment
-  name_prefix = "${var.project}-${var.environment}"
 }
+
