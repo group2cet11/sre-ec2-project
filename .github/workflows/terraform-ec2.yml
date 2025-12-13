@@ -73,7 +73,7 @@ jobs:
       # Terraform Plan
       # ---------------------------
       - name: Terraform Plan
-        run: terraform plan -var-file=envs/${{ steps.env_select.outputs.env }}.tfvars -out=tfplan
+        run: terraform plan -var-file=envs/${TF_ENV}.tfvars -out=tfplan
 
       # ---------------------------
       # Terraform Apply
