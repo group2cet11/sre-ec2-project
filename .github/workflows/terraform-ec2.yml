@@ -38,7 +38,7 @@ jobs:
         run: echo "TF_ENV=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
 
       - name: Debug selected environment
-        run: echo "Deploying environment: $TF_ENV"
+        run: 'echo "Deploying environment: $TF_ENV"'
 
       # ---------------------------
       # AWS Authentication (OIDC)
@@ -105,5 +105,6 @@ jobs:
           echo "**Environment:** $TF_ENV" >> $GITHUB_STEP_SUMMARY
           echo "**Public IP:** $IP" >> $GITHUB_STEP_SUMMARY
           echo "[Open Website](http://$IP)" >> $GITHUB_STEP_SUMMARY
+
 
 
