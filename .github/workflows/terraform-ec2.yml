@@ -1,4 +1,4 @@
-name: Terraform EC2 Deployment
+name: Terraform EC2 Deployments
 
 on:
   workflow_dispatch:
@@ -87,5 +87,6 @@ jobs:
           echo "**Environment:** $TF_ENV" >> $GITHUB_STEP_SUMMARY
           echo "**Public IP:** $IP" >> $GITHUB_STEP_SUMMARY
           echo "[Open Website](http://$IP)" >> $GITHUB_STEP_SUMMARY
+
 
 
