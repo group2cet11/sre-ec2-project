@@ -76,9 +76,8 @@ jobs:
       # Terraform PLAN
       # ---------------------------
       - name: Terraform Plan
-        run: terraform plan \
-             -var-file=envs/${{ steps.env_select.outputs.env }}.tfvars \
-             -out=tfplan
+        run: terraform plan -var-file=envs/${TF_ENV}.tfvars -out=tfplan
+
 
       # ---------------------------
       # Terraform APPLY
@@ -104,3 +103,4 @@ jobs:
           if [ ! -z "$IP" ]; then
             echo "[Open Website](http://$IP)" >> $GITHUB_STEP_SUMMARY
           fi
+
