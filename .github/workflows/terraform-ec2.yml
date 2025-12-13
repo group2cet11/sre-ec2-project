@@ -58,9 +58,9 @@ jobs:
       - name: Terraform Plan
         run: terraform plan -var-file=envs/${TF_ENV}.tfvars -out=tfplan
 
-      # Manual Approval BEFORE PROD apply
+      # Manual approval BEFORE PROD deployment
       - name: Manual Approval Before Prod Deploy
-      - if: ${{ env.TF_ENV == 'prod' }}
+        if: ${{ env.TF_ENV == 'prod' }}
         uses: trstringer/manual-approval@v1
         with:
           secret: ${{ secrets.GITHUB_TOKEN }}
@@ -73,7 +73,7 @@ jobs:
         if: ${{ env.TF_ENV != 'prod' }}
         run: terraform apply -auto-approve tfplan
 
-      # Apply after approval for prod
+      # Apply for prod after approval
       - name: Terraform Apply (prod)
         if: ${{ env.TF_ENV == 'prod' }}
         run: terraform apply -auto-approve tfplan
