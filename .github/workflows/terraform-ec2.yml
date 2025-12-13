@@ -23,51 +23,85 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: terraform   # root terraform folder
+
     steps:
-      # -----------------------------
-      # CHECKOUT REPO
-      # -----------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # -----------------------------
-      # CAPTURE ENVIRONMENT SELECTION
-      # -----------------------------
-      - name: Set selected ENV
+      # ---------------------------
+      # Determine ENV from dropdown
+      # ---------------------------
+      - name: Set selected environment
         run: echo "TF_ENV=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
 
       - name: Debug selected environment
         run: echo "Deploying environment: $TF_ENV"
 
-      # -----------------------------
-      # AWS AUTH VIA OIDC
-      # -----------------------------
-      - name: Configure AWS credentials via OIDC
+      # ---------------------------
+      # AWS Authentication (OIDC)
+      # ---------------------------
+      - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::108471662249:role/GhaDeployRole
           aws-region: ${{ env.AWS_REGION }}
 
-      # -----------------------------
-      # INSTALL TERRAFORM
-      # -----------------------------
+      # ---------------------------
+      # Terraform Setup
+      # ---------------------------
       - name: Install Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.8.5
 
-      # -----------------------------
-      # TERRAFORM INIT (USE CORRECT BACKEND)
-      # -----------------------------
-      - name: Terraform Init
-        working-directory: terraform
-        run: terraform init -backend-config="backend/${TF_ENV}.tfbackend"
+      # ---------------------------
+      # Terraform Init
+      # ---------------------------
+      - name: Terraform Init (correct backend)
+        run: terraform init -input=false -backend-config="backend/${TF_ENV}.tfbackend"
 
-      # -----------------------------
-      # VALIDATE
-      # -----------------------------
+      # ---------------------------
+      # Terraform Validate
+      # ---------------------------
       - name: Terraform Validate
-        working-directory: terraform
         run: terraform validate
 
-      # ----------------
+      # ---------------------------
+      # Terraform Plan
+      # ---------------------------
+      - name: Terraform Plan
+        run: terraform plan -var-file="envs/${TF_ENV}.tfvars" -out=tfplan
+
+      # ---------------------------
+      # Terraform Apply
+      # Protect PROD from auto-apply
+      # ---------------------------
+      - name: Terraform Apply (non-prod)
+        if: ${{ env.TF_ENV != 'prod' }}
+        run: terraform apply -auto-approve tfplan
+
+      - name: Terraform Apply Blocked for PROD
+        if: ${{ env.TF_ENV == 'prod' }}
+        run: |
+          echo "## ⚠️ Production NOT auto-applied" >> $GITHUB_STEP_SUMMARY
+          echo "Run manually from CloudShell or local machine:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "terraform init -backend-config=backend/prod.tfbackend" >> $GITHUB_STEP_SUMMARY
+          echo "terraform apply -var-file=envs/prod.tfvars" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      # ---------------------------
+      # Output EC2 Public IP (dev/uat only)
+      # ---------------------------
+      - name: Output EC2 Public IP
+        if: ${{ env.TF_ENV != 'prod' }}
+        run: |
+          IP=$(terraform output -json | jq -r '.public_ip.value')
+          echo "EC2_IP=$IP" >> $GITHUB_ENV
+          echo "## 🚀 EC2 Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** $TF_ENV" >> $GITHUB_STEP_SUMMARY
+          echo "**Public IP:** $IP" >> $GITHUB_STEP_SUMMARY
+          echo "[Open Website](http://$IP)" >> $GITHUB_STEP_SUMMARY
