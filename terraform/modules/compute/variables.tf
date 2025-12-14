@@ -1,5 +1,5 @@
 #############################################
-# terraform/modules/compute/variables.tf
+# terraform/modules/compute/variables.tf (updated)
 #############################################
 variable "subnet_id" {
   type        = string
@@ -44,5 +44,5 @@ variable "name_prefix" {
 
 variable "prometheus_ecs_sg_id" {
   type        = string
-  description = "Security group ID of the Prometheus Fargate tasks (to allow Node Exporter access on port 9100)"
+  description = "Security group ID of the Prometheus Fargate tasks (to allow 9100 access)"
 }
