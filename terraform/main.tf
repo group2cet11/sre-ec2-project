@@ -14,11 +14,6 @@ terraform {
   backend "s3" {}
 }
 
-variable "environment" {
-  type = string
-  description = "Environment name (dev/uat/prod)"
-}
-
 locals {
   prefix = "sre-${var.environment}"
 }
@@ -51,3 +46,4 @@ output "public_ip" {
   value       = module.compute.public_ip
   description = "Public IP of the EC2 instance"
 }
+
