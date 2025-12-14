@@ -56,7 +56,10 @@ jobs:
         run: terraform validate
 
       - name: Terraform Plan
-        run: terraform plan -var-file="envs/${{ env.TF_ENV }}.tfvars" -out=tfplan
+        run: terraform plan -var-file="envs/${{ env.TF_ENV }}.tfvars" -lock=false -out=tfplan
+
+      #- name: Terraform Plan
+      #  run: terraform plan -var-file="envs/${{ env.TF_ENV }}.tfvars" -out=tfplan
 
       - name: Manual Approval Before Prod Deploy
         if: ${{ env.TF_ENV == 'prod' }}
@@ -84,4 +87,5 @@ jobs:
           echo "**Environment:** ${{ env.TF_ENV }}" >> $GITHUB_STEP_SUMMARY
           echo "**Public IP:** $IP" >> $GITHUB_STEP_SUMMARY
           echo "[Open Website](http://$IP)" >> $GITHUB_STEP_SUMMARY
+
 
