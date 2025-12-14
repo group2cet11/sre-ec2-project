@@ -1,5 +1,5 @@
 #############################################
-# terraform/main.tf (supports separate deploy per environment)
+# terraform/main.tf (fixed - no destroy on environment change)
 #############################################
 terraform {
   required_version = ">= 1.5.0"
@@ -13,7 +13,15 @@ terraform {
   backend "s3" {}
 }
 
-# Only deploy the selected environment
+locals {
+  prefix = "${var.project}-${var.environment}"
+}
+
+# Use data source for existing log group (avoids "already exists" error)
+data "aws_cloudwatch_log_group" "ec2" {
+  name = "/sre/${var.environment}/ec2"
+}
+
 module "compute" {
   source            = "./modules/compute"
   subnet_id         = var.subnet_id
@@ -23,21 +31,13 @@ module "compute" {
   key_name          = var.key_name
   environment       = var.environment
   userdata_revision = var.userdata_revision
-  name_prefix       = "${var.project}-${var.environment}"
+  name_prefix       = local.prefix
 }
 
-resource "aws_cloudwatch_log_group" "ec2" {
-  name              = "/sre/${var.environment}/ec2"
-  retention_in_days = 14
-  tags = {
-    Environment = var.environment
-  }
+output "log_group_name" {
+  value = data.aws_cloudwatch_log_group.ec2.name
 }
 
 output "public_ip" {
   value = module.compute.public_ip
-}
-
-output "log_group_name" {
-  value = aws_cloudwatch_log_group.ec2.name
 }
