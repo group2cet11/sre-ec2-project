@@ -1,12 +1,11 @@
 #############################################
-# terraform/modules/compute/main.tf
+# terraform/modules/compute/main.tf (fully corrected with automation)
 #############################################
 resource "aws_security_group" "ec2_sg" {
   name        = "${var.name_prefix}-ec2-sg"
   description = "Security group for ${var.name_prefix} EC2 instance"
   vpc_id      = var.vpc_id
 
-  # Allow HTTP from anywhere (your web app)
   ingress {
     description = "Allow HTTP"
     from_port   = 80
@@ -15,7 +14,6 @@ resource "aws_security_group" "ec2_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Allow SSH (restrict in production!)
   ingress {
     description = "Allow SSH"
     from_port   = 22
@@ -24,7 +22,6 @@ resource "aws_security_group" "ec2_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Allow Node Exporter metrics from Prometheus Fargate tasks
   ingress {
     description              = "Allow Node Exporter from Prometheus Fargate"
     from_port                = 9100
@@ -33,7 +30,6 @@ resource "aws_security_group" "ec2_sg" {
     source_security_group_id = var.prometheus_ecs_sg_id
   }
 
-  # Allow all outbound
   egress {
     from_port   = 0
     to_port     = 0
@@ -54,31 +50,28 @@ resource "aws_instance" "app" {
   key_name                    = var.key_name
   associate_public_ip_address = true
 
-  # Force user_data replacement when revision changes
   user_data_replace_on_change = true
 
   user_data = <<-EOF
     #!/bin/bash
     set -e
 
-    # Update system (works on both Ubuntu and Amazon Linux)
+    # Update system (Ubuntu or Amazon Linux)
     if command -v apt-get >/dev/null; then
       apt-get update -y
     elif command -v yum >/dev/null; then
       yum update -y
     fi
 
-    # Install Node Exporter (v1.8.2 - latest stable as of Dec 2025)
+    # Install Node Exporter
     NODE_VERSION="1.8.2"
     wget -q https://github.com/prometheus/node_exporter/releases/download/v${NODE_VERSION}/node_exporter-${NODE_VERSION}.linux-amd64.tar.gz
     tar xvfz node_exporter-${NODE_VERSION}.linux-amd64.tar.gz
     mv node_exporter-${NODE_VERSION}.linux-amd64/node_exporter /usr/local/bin/
     rm -rf node_exporter*
 
-    # Create node_exporter user
     useradd --no-create-home --shell /bin/false node_exporter || true
 
-    # Create systemd service
     cat <<EOL > /etc/systemd/system/node-exporter.service
 [Unit]
 Description=Prometheus Node Exporter
@@ -95,20 +88,18 @@ ExecStart=/usr/local/bin/node_exporter
 WantedBy=multi-user.target
 EOL
 
-    # Start and enable service
     systemctl daemon-reload
     systemctl enable node-exporter
     systemctl start node-exporter
 
-    # Simple web page
+    # Your original web page
     echo "Hello SRE World! - ${var.environment} Environment" > /var/www/html/index.html
-
     EOF
 
   tags = {
     Name        = "${var.name_prefix}-ec2"
     Environment = var.environment
-    Monitor     = "true"  # Critical for Prometheus EC2 discovery
+    Monitor     = "true"
   }
 }
 
