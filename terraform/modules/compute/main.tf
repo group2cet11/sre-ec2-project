@@ -1,5 +1,5 @@
 #############################################
-# terraform/modules/compute/main.tf (fully corrected with automation)
+# terraform/modules/compute/main.tf (automated Node Exporter + tags)
 #############################################
 resource "aws_security_group" "ec2_sg" {
   name        = "${var.name_prefix}-ec2-sg"
@@ -23,11 +23,11 @@ resource "aws_security_group" "ec2_sg" {
   }
 
   ingress {
-    description              = "Allow Node Exporter from Prometheus Fargate"
-    from_port                = 9100
-    to_port                  = 9100
-    protocol                 = "tcp"
-    source_security_group_id = var.prometheus_ecs_sg_id
+    description = "Allow Node Exporter from VPC (Prometheus can reach it)"
+    from_port   = 9100
+    to_port     = 9100
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/16"]  # Adjust if your VPC CIDR is different
   }
 
   egress {
@@ -56,14 +56,14 @@ resource "aws_instance" "app" {
     #!/bin/bash
     set -e
 
-    # Update system (Ubuntu or Amazon Linux)
+    # Update system
     if command -v apt-get >/dev/null; then
       apt-get update -y
     elif command -v yum >/dev/null; then
       yum update -y
     fi
 
-    # Install Node Exporter
+    # Install Node Exporter (latest stable - v1.8.2 as of Dec 2025)
     NODE_VERSION="1.8.2"
     wget -q https://github.com/prometheus/node_exporter/releases/download/v${NODE_VERSION}/node_exporter-${NODE_VERSION}.linux-amd64.tar.gz
     tar xvfz node_exporter-${NODE_VERSION}.linux-amd64.tar.gz
@@ -92,14 +92,14 @@ EOL
     systemctl enable node-exporter
     systemctl start node-exporter
 
-    # Your original web page
+    # Simple web page
     echo "Hello SRE World! - ${var.environment} Environment" > /var/www/html/index.html
     EOF
 
   tags = {
     Name        = "${var.name_prefix}-ec2"
     Environment = var.environment
-    Monitor     = "true"
+    Monitor     = "true"  # For Prometheus EC2 discovery
   }
 }
 
