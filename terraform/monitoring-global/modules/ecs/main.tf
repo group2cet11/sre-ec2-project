@@ -61,7 +61,7 @@ resource "aws_ecs_task_definition" "prom" {
   container_definitions = jsonencode([
     {
       name      = "prometheus"
-      image     = "108471662249.dkr.ecr.us-east-1.amazonaws.com/sre-prometheus:latest"  # Your custom image
+      image     = "108471662249.dkr.ecr.us-east-1.amazonaws.com/sre-prometheus:latest"  # Your custom image with baked prometheus.yml
       essential = true
 
       portMappings = [
@@ -92,10 +92,12 @@ resource "aws_ecs_task_definition" "prom" {
 
   volume {
     name = "storage"
+
     efs_volume_configuration {
       file_system_id     = var.efs_id
       root_directory     = "/"
       transit_encryption = "ENABLED"
+
       authorization_config {
         access_point_id = var.prometheus_ap_id
         iam             = "ENABLED"
