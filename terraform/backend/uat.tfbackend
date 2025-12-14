@@ -1,7 +1,7 @@
 #############################################
-# terraform/backend/dev.tfbackend (update or create)
+# terraform/backend/uat.tfbackend (update or create)
 #############################################
 bucket = "dave-terraform-backend"
-key    = "ec2/dev/terraform.tfstate"  # Per-env key
+key    = "ec2/uat/terraform.tfstate"  # Per-env key
 region = "us-east-1"
-dynamodb_table = "terraform-locks"    # Keep if you have it
+dynamodb_table = "terraform-locks"
