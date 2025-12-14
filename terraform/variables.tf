@@ -1,5 +1,5 @@
 #############################################
-# terraform/variables.tf (root variables - updated)
+# terraform/variables.tf (complete root variables)
 #############################################
 variable "region" {
   description = "AWS region"
@@ -21,12 +21,11 @@ variable "environment" {
 variable "ami_id" {
   description = "AMI ID for Amazon Linux 2023 in us-east-1"
   type        = string
-  # Amazon Linux 2023 (AL2023) AMI in us-east-1 (as of Dec 2025)
   default     = "ami-0c101f26f147fa7fd"
 }
 
 variable "userdata_revision" {
-  description = "Bump this number to force EC2 replacement and re-run user_data (e.g., after Node Exporter changes)"
+  description = "Bump to force EC2 replacement and re-run user_data"
   type        = number
   default     = 1
 }
@@ -40,4 +39,14 @@ variable "project" {
   type        = string
   description = "Project name prefix"
   default     = "sre"
+}
+
+variable "subnet_id" {
+  type        = string
+  description = "Subnet ID for the EC2 instance (pass from workflow or .tfvars)"
+}
+
+variable "vpc_id" {
+  type        = string
+  description = "VPC ID (pass from workflow or .tfvars)"
 }
