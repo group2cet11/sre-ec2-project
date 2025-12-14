@@ -1,4 +1,4 @@
-bucket         = "sre-terraform-state"
-key            = "ec2/prod/terraform.tfstate"
+bucket         = "dave-terraform-backend"
+key            = "ec2/dev/terraform.tfstate"
 region         = "us-east-1"
-dynamodb_table = "terraform-locks"
+dynamodb_table = "terraform-locks"  # Optional, if you have one; otherwise remove
