@@ -69,11 +69,11 @@ jobs:
 
       - name: Terraform Apply (non-prod)
         if: ${{ env.TF_ENV != 'prod' }}
-        run: terraform apply -auto-approve tfplan
+        run: terraform apply -auto-approve -lock=false tfplan
 
       - name: Terraform Apply (prod)
         if: ${{ env.TF_ENV == 'prod' }}
-        run: terraform apply -auto-approve tfplan
+        run: terraform apply -auto-approve -lock=false tfplan
 
       - name: Output EC2 Public IP
         if: ${{ env.TF_ENV != 'prod' }}
@@ -84,3 +84,4 @@ jobs:
           echo "**Environment:** ${{ env.TF_ENV }}" >> $GITHUB_STEP_SUMMARY
           echo "**Public IP:** $IP" >> $GITHUB_STEP_SUMMARY
           echo "[Open Website](http://$IP)" >> $GITHUB_STEP_SUMMARY
+
