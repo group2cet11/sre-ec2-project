@@ -1,3 +1,6 @@
+#############################################
+# terraform/modules/compute/main.tf
+#############################################
 resource "aws_security_group" "ec2_sg" {
   name        = "${var.name_prefix}-ec2-sg"
   description = "Security group for ${var.name_prefix} EC2 instance"
@@ -21,13 +24,13 @@ resource "aws_security_group" "ec2_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Allow Node Exporter metrics from Prometheus (Fargate tasks)
+  # Allow Node Exporter metrics from Prometheus Fargate tasks
   ingress {
-    description      = "Allow Node Exporter from Prometheus Fargate"
-    from_port        = 9100
-    to_port          = 9100
-    protocol         = "tcp"
-    source_security_group_id = var.prometheus_ecs_sg_id  # Pass this from root module
+    description              = "Allow Node Exporter from Prometheus Fargate"
+    from_port                = 9100
+    to_port                  = 9100
+    protocol                 = "tcp"
+    source_security_group_id = var.prometheus_ecs_sg_id
   }
 
   # Allow all outbound
@@ -44,19 +47,21 @@ resource "aws_security_group" "ec2_sg" {
 }
 
 resource "aws_instance" "app" {
-  ami                    = var.ami_id
-  instance_type          = var.instance_type
-  subnet_id              = var.subnet_id
-  vpc_security_group_ids = [aws_security_group.ec2_sg.id]
-  key_name               = var.key_name
-  associate_public_ip_address = true  # Ensures public IP for output
+  ami                         = var.ami_id
+  instance_type               = var.instance_type
+  subnet_id                   = var.subnet_id
+  vpc_security_group_ids      = [aws_security_group.ec2_sg.id]
+  key_name                    = var.key_name
+  associate_public_ip_address = true
 
-  # Automated Node Exporter installation + simple web page
+  # Force user_data replacement when revision changes
+  user_data_replace_on_change = true
+
   user_data = <<-EOF
     #!/bin/bash
     set -e
 
-    # Update system
+    # Update system (works on both Ubuntu and Amazon Linux)
     if command -v apt-get >/dev/null; then
       apt-get update -y
     elif command -v yum >/dev/null; then
@@ -95,15 +100,15 @@ EOL
     systemctl enable node-exporter
     systemctl start node-exporter
 
-    # Simple web page (your original)
-    echo "Hello SRE World! - ${var.name_prefix} Environment" > /var/www/html/index.html
+    # Simple web page
+    echo "Hello SRE World! - ${var.environment} Environment" > /var/www/html/index.html
 
     EOF
 
   tags = {
     Name        = "${var.name_prefix}-ec2"
-    Environment = var.environment_name  # e.g., dev, uat, prod
-    Monitor     = "true"                # Required for Prometheus EC2 discovery
+    Environment = var.environment
+    Monitor     = "true"  # Critical for Prometheus EC2 discovery
   }
 }
 
