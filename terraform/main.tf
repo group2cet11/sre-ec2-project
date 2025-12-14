@@ -1,5 +1,5 @@
 #############################################
-# terraform/main.tf (root module - simple EC2 deployment with monitoring-ready features)
+# terraform/main.tf (fixed version)
 #############################################
 terraform {
   required_version = ">= 1.5.0"
@@ -10,12 +10,58 @@ terraform {
     }
   }
 
-  # Silences the backend warning when using -backend-config
   backend "s3" {}
 }
 
+# Declare all variables used in the root module
+variable "environment" {
+  type        = string
+  description = "Environment name (dev/uat/prod)"
+}
+
+variable "region" {
+  type        = string
+  default     = "us-east-1"
+}
+
+variable "instance_type" {
+  type        = string
+  default     = "t3.micro"
+}
+
+variable "ami_id" {
+  type        = string
+  default     = "ami-0c101f26f147fa7fd"
+}
+
+variable "key_name" {
+  type        = string
+  description = "EC2 key pair name"
+}
+
+variable "subnet_id" {
+  type        = string
+  description = "Subnet ID for the EC2 instance"
+}
+
+variable "vpc_id" {
+  type        = string
+  description = "VPC ID"
+}
+
+variable "userdata_revision" {
+  type        = number
+  default     = 1
+  description = "Bump this to force EC2 replacement"
+}
+
+variable "project" {
+  type    = string
+  default = "sre"
+}
+
 locals {
-  prefix = "sre-${var.environment}"
+  prefix = "${var.project}-${var.environment}"
 }
 
 resource "aws_cloudwatch_log_group" "ec2" {
@@ -28,8 +74,8 @@ resource "aws_cloudwatch_log_group" "ec2" {
 
 module "compute" {
   source            = "./modules/compute"
-  subnet_id         = var.subnet_id          # Pass from .tfvars or workflow
-  vpc_id            = var.vpc_id             # Pass from .tfvars or workflow
+  subnet_id         = var.subnet_id
+  vpc_id            = var.vpc_id
   instance_type     = var.instance_type
   ami_id            = var.ami_id
   key_name          = var.key_name
@@ -43,7 +89,5 @@ output "log_group_name" {
 }
 
 output "public_ip" {
-  value       = module.compute.public_ip
-  description = "Public IP of the EC2 instance"
+  value = module.compute.public_ip
 }
-
