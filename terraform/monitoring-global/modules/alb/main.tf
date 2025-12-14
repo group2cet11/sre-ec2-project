@@ -21,6 +21,15 @@ resource "aws_lb_target_group" "prometheus" {
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
   target_type = "ip"
+
+  health_check {
+    path                = "/-/ready"
+    matcher             = "200"
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    interval            = 30
+    timeout             = 5
+  }
 }
 
 resource "aws_lb_target_group" "grafana" {
@@ -29,6 +38,15 @@ resource "aws_lb_target_group" "grafana" {
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
   target_type = "ip"
+
+  health_check {
+    path                = "/api/health"
+    matcher             = "200"
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    interval            = 30
+    timeout             = 5
+  }
 }
 
 #############################################

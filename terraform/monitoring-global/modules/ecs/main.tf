@@ -1,5 +1,5 @@
 #############################################
-# terraform/monitoring-global/modules/ecs/main.tf (updated for custom Prometheus image)
+# terraform/monitoring-global/modules/ecs/main.tf
 #############################################
 # VARIABLES
 #############################################
@@ -23,7 +23,7 @@ data "aws_iam_role" "ecs_exec" {
 }
 
 #############################################
-# IAM POLICY — Allow ECS task to read S3 config (optional if not using S3 config)
+# IAM POLICY — Allow ECS task to read S3 config (optional - keep if you use S3 later)
 #############################################
 resource "aws_iam_role_policy" "ecs_exec_s3" {
   name = "ecs-exec-s3-policy"
@@ -61,7 +61,7 @@ resource "aws_ecs_task_definition" "prom" {
   container_definitions = jsonencode([
     {
       name      = "prometheus"
-      image     = "108471662249.dkr.ecr.us-east-1.amazonaws.com/sre-prometheus:latest"  # Your custom image with prometheus.yml
+      image     = "108471662249.dkr.ecr.us-east-1.amazonaws.com/sre-prometheus:latest"  # Your custom image
       essential = true
 
       portMappings = [
@@ -92,12 +92,10 @@ resource "aws_ecs_task_definition" "prom" {
 
   volume {
     name = "storage"
-
     efs_volume_configuration {
       file_system_id     = var.efs_id
       root_directory     = "/"
       transit_encryption = "ENABLED"
-
       authorization_config {
         access_point_id = var.prometheus_ap_id
         iam             = "ENABLED"
