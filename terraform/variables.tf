@@ -1,3 +1,6 @@
+#############################################
+# terraform/variables.tf (root variables - updated)
+#############################################
 variable "region" {
   description = "AWS region"
   type        = string
@@ -18,12 +21,12 @@ variable "environment" {
 variable "ami_id" {
   description = "AMI ID for Amazon Linux 2023 in us-east-1"
   type        = string
-  # Replace if needed; validate in your account/region
-  default = "ami-0c101f26f147fa7fd"
+  # Amazon Linux 2023 (AL2023) AMI in us-east-1 (as of Dec 2025)
+  default     = "ami-0c101f26f147fa7fd"
 }
 
 variable "userdata_revision" {
-  description = "Bump to force EC2 replacement and re-run user_data"
+  description = "Bump this number to force EC2 replacement and re-run user_data (e.g., after Node Exporter changes)"
   type        = number
   default     = 1
 }
@@ -36,5 +39,5 @@ variable "key_name" {
 variable "project" {
   type        = string
   description = "Project name prefix"
-  default     = "sre" # <-- You can change this anytime
+  default     = "sre"
 }
