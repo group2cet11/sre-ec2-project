@@ -1,5 +1,5 @@
 #############################################
-# terraform/modules/compute/variables.tf (updated)
+# terraform/modules/compute/variables.tf
 #############################################
 variable "subnet_id" {
   type        = string
@@ -40,9 +40,4 @@ variable "userdata_revision" {
 variable "name_prefix" {
   type        = string
   description = "Prefix for resource names"
-}
-
-variable "prometheus_ecs_sg_id" {
-  type        = string
-  description = "Security group ID of the Prometheus Fargate tasks (to allow 9100 access)"
 }
