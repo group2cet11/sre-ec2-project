@@ -1,5 +1,5 @@
 #############################################
-# terraform/monitoring-global/modules/ecs/main.tf
+# terraform/monitoring-global/modules/ecs/main.tf (complete and final version)
 #############################################
 # VARIABLES
 #############################################
@@ -47,7 +47,7 @@ resource "aws_iam_role_policy" "ecs_exec_s3" {
 }
 
 #############################################
-# PROMETHEUS TASK DEFINITION (using your custom ECR image with EC2 discovery)
+# PROMETHEUS TASK DEFINITION (using your custom ECR image with baked config)
 #############################################
 resource "aws_ecs_task_definition" "prom" {
   family                   = "prometheus"
@@ -61,7 +61,7 @@ resource "aws_ecs_task_definition" "prom" {
   container_definitions = jsonencode([
     {
       name      = "prometheus"
-      image     = "108471662249.dkr.ecr.us-east-1.amazonaws.com/sre-prometheus:latest"  # Your custom image with baked prometheus.yml
+      image     = "108471662249.dkr.ecr.us-east-1.amazonaws.com/sre-prometheus:latest"
       essential = true
 
       portMappings = [
