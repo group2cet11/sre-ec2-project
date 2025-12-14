@@ -1,0 +1,7 @@
+FROM prom/prometheus:latest
+
+# Copy your custom config
+COPY prometheus.yml /etc/prometheus/prometheus.yml
+
+# Optional: Add your custom flags if needed
+# CMD [ "--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus" ]
