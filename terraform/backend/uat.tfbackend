@@ -1,4 +1,7 @@
-bucket         = "dave-terraform-backend"
-key            = "ec2/dev/terraform.tfstate"
-region         = "us-east-1"
-dynamodb_table = "terraform-locks"  # Optional, if you have one; otherwise remove
+#############################################
+# terraform/backend/dev.tfbackend (update or create)
+#############################################
+bucket = "dave-terraform-backend"
+key    = "ec2/dev/terraform.tfstate"  # Per-env key
+region = "us-east-1"
+dynamodb_table = "terraform-locks"    # Keep if you have it
