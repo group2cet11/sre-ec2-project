@@ -1,5 +1,5 @@
 #############################################
-# terraform/main.tf (fixed - no duplicate variables)
+# terraform/main.tf (clean - no duplicates)
 #############################################
 terraform {
   required_version = ">= 1.5.0"
@@ -10,12 +10,8 @@ terraform {
     }
   }
 
-  # Silences the backend warning
   backend "s3" {}
 }
-
-# All variables are declared in variables.tf - do NOT redeclare them here
-# (this was the cause of the duplicate errors)
 
 locals {
   prefix = "${var.project}-${var.environment}"
