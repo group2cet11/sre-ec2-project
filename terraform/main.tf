@@ -1,6 +1,3 @@
-#############################################
-# terraform/main.tf (clean root module - no variable declarations)
-#############################################
 terraform {
   required_version = ">= 1.5.0"
   required_providers {
@@ -13,30 +10,44 @@ terraform {
   backend "s3" {}
 }
 
+# Define the 3 environments
 locals {
-  prefix = "${var.project}-${var.environment}"
+  environments = ["dev", "uat", "prod"]
+  prefix       = "sre"
 }
 
-data "aws_cloudwatch_log_group" "ec2" {
-  name = "/sre/${var.environment}/ec2"
+# Create CloudWatch log group for each environment
+resource "aws_cloudwatch_log_group" "ec2" {
+  for_each = toset(local.environments)
+
+  name              = "/sre/${each.key}/ec2"
+  retention_in_days = 14
+  tags = {
+    Environment = each.key
+  }
 }
 
+# Deploy one EC2 per environment
 module "compute" {
+  for_each = toset(local.environments)
+
   source            = "./modules/compute"
-  subnet_id         = var.subnet_id
+  subnet_id         = var.subnet_id            # You can make this per-env if needed
   vpc_id            = var.vpc_id
   instance_type     = var.instance_type
   ami_id            = var.ami_id
   key_name          = var.key_name
-  environment       = var.environment
+  environment       = each.key
   userdata_revision = var.userdata_revision
-  name_prefix       = local.prefix
+  name_prefix       = "${local.prefix}-${each.key}"
 }
 
-output "log_group_name" {
-  value = data.aws_cloudwatch_log_group.ec2.name
+# Outputs - all public IPs
+output "ec2_public_ips" {
+  value = { for env, mod in module.compute : env => mod.public_ip }
+  description = "Public IPs for all environments"
 }
 
-output "public_ip" {
-  value = module.compute.public_ip
+output "log_group_names" {
+  value = { for env, lg in aws_cloudwatch_log_group.ec2 : env => lg.name }
 }
