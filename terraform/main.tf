@@ -1,5 +1,5 @@
 #############################################
-# terraform/main.tf (updated root module)
+# terraform/main.tf (root module - updated)
 #############################################
 terraform {
   required_version = ">= 1.5.0"
@@ -15,9 +15,6 @@ locals {
   name_prefix = "sre-${var.environment}"
 }
 
-# -------------------------------
-# NETWORK MODULE
-# -------------------------------
 module "network" {
   source      = "./modules/network"
   region      = var.region
@@ -25,17 +22,11 @@ module "network" {
   name_prefix = "${var.project}-${var.environment}"
 }
 
-# -------------------------------
-# MONITORING MODULE (global - dev/uat/prod share it)
-# -------------------------------
 module "monitoring" {
   source      = "./modules/monitoring"
   environment = var.environment
 }
 
-# -------------------------------
-# EC2 COMPUTE MODULE
-# -------------------------------
 module "compute" {
   source               = "./modules/compute"
   subnet_id            = module.network.public_subnet_ids[0]
@@ -46,10 +37,9 @@ module "compute" {
   environment          = var.environment
   userdata_revision    = var.userdata_revision
   name_prefix          = "${var.project}-${var.environment}"
-  prometheus_ecs_sg_id = module.monitoring.ecs_sg_id  # Pass Prometheus Fargate SG
+  prometheus_ecs_sg_id = module.monitoring.ecs_sg_id  # Pass from monitoring module
 }
 
-# Outputs
 output "ec2_public_ip" {
   value = module.compute.public_ip
 }
