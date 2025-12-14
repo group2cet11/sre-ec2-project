@@ -1,4 +1,6 @@
 #############################################
+# terraform/monitoring-global/modules/ecs/main.tf (updated for custom Prometheus image)
+#############################################
 # VARIABLES
 #############################################
 variable "cluster_name" {}
@@ -21,21 +23,20 @@ data "aws_iam_role" "ecs_exec" {
 }
 
 #############################################
-# IAM POLICY — Allow ECS task to read S3 config
+# IAM POLICY — Allow ECS task to read S3 config (optional if not using S3 config)
 #############################################
 resource "aws_iam_role_policy" "ecs_exec_s3" {
   name = "ecs-exec-s3-policy"
   role = data.aws_iam_role.ecs_exec.name
-
   policy = jsonencode({
-    Version = "2012-10-17",
+    Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow",
+        Effect = "Allow"
         Action = [
           "s3:GetObject",
           "s3:ListBucket"
-        ],
+        ]
         Resource = [
           "arn:aws:s3:::sre-monitoring-config",
           "arn:aws:s3:::sre-monitoring-config/*"
@@ -46,38 +47,46 @@ resource "aws_iam_role_policy" "ecs_exec_s3" {
 }
 
 #############################################
-# PROMETHEUS TASK DEFINITION
+# PROMETHEUS TASK DEFINITION (using your custom ECR image with EC2 discovery)
 #############################################
 resource "aws_ecs_task_definition" "prom" {
   family                   = "prometheus"
-  cpu                      = "256"
-  memory                   = "512"
+  cpu                      = "512"
+  memory                   = "1024"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-
-  execution_role_arn = data.aws_iam_role.ecs_exec.arn
-  task_role_arn      = data.aws_iam_role.ecs_exec.arn
+  execution_role_arn       = data.aws_iam_role.ecs_exec.arn
+  task_role_arn            = data.aws_iam_role.ecs_exec.arn
 
   container_definitions = jsonencode([
     {
       name      = "prometheus"
-      image     = "prom/prometheus"
+      image     = "108471662249.dkr.ecr.us-east-1.amazonaws.com/sre-prometheus:latest"  # Your custom image with prometheus.yml
       essential = true
 
-      # Run shell commands inside container
-      entryPoint = ["sh", "-c"]
-      command = [
-        "apk add --no-cache aws-cli && aws s3 cp s3://sre-monitoring-config/prometheus/prometheus.yml /prometheus/prometheus.yml && /bin/prometheus --config.file=/prometheus/prometheus.yml --storage.tsdb.path=/prometheus"
+      portMappings = [
+        {
+          containerPort = 9090
+          protocol      = "tcp"
+        }
       ]
 
-      portMappings = [{
-        containerPort = 9090
-      }]
+      mountPoints = [
+        {
+          sourceVolume  = "storage"
+          containerPath = "/prometheus"
+          readOnly      = false
+        }
+      ]
 
-      mountPoints = [{
-        containerPath = "/prometheus"
-        sourceVolume  = "storage"
-      }]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = "/ecs/prometheus"
+          awslogs-region        = "us-east-1"
+          awslogs-stream-prefix = "ecs"
+        }
+      }
     }
   ])
 
@@ -106,18 +115,30 @@ resource "aws_ecs_task_definition" "graf" {
   memory                   = "512"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-
-  execution_role_arn = data.aws_iam_role.ecs_exec.arn
-  task_role_arn      = data.aws_iam_role.ecs_exec.arn
+  execution_role_arn       = data.aws_iam_role.ecs_exec.arn
+  task_role_arn            = data.aws_iam_role.ecs_exec.arn
 
   container_definitions = jsonencode([
     {
-      name  = "grafana"
-      image = "grafana/grafana"
+      name      = "grafana"
+      image     = "grafana/grafana:latest"
+      essential = true
 
-      portMappings = [{
-        containerPort = 3000
-      }]
+      portMappings = [
+        {
+          containerPort = 3000
+          protocol      = "tcp"
+        }
+      ]
+
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = "/ecs/grafana"
+          awslogs-region        = "us-east-1"
+          awslogs-stream-prefix = "ecs"
+        }
+      }
     }
   ])
 }
@@ -144,14 +165,12 @@ resource "aws_ecs_service" "prometheus" {
     container_port   = 9090
   }
 
-  depends_on = [
-    aws_ecs_task_definition.prom
-  ]
+  depends_on = [aws_ecs_task_definition.prom]
 }
 
-###############################################
+#############################################
 # GRAFANA ECS SERVICE
-###############################################
+#############################################
 resource "aws_ecs_service" "grafana" {
   name            = "grafana-service"
   cluster         = data.aws_ecs_cluster.cluster.cluster_name
@@ -171,9 +190,7 @@ resource "aws_ecs_service" "grafana" {
     container_port   = 3000
   }
 
-  depends_on = [
-    aws_ecs_task_definition.graf
-  ]
+  depends_on = [aws_ecs_task_definition.graf]
 }
 
 #############################################
