@@ -1,5 +1,5 @@
 #############################################
-# terraform/modules/compute/main.tf (automated Node Exporter + tags)
+# terraform/modules/compute/main.tf (fixed user_data interpolation)
 #############################################
 resource "aws_security_group" "ec2_sg" {
   name        = "${var.name_prefix}-ec2-sg"
@@ -23,7 +23,7 @@ resource "aws_security_group" "ec2_sg" {
   }
 
   ingress {
-    description = "Allow Node Exporter from VPC (Prometheus can reach it)"
+    description = "Allow Node Exporter from VPC"
     from_port   = 9100
     to_port     = 9100
     protocol    = "tcp"
@@ -63,11 +63,11 @@ resource "aws_instance" "app" {
       yum update -y
     fi
 
-    # Install Node Exporter (latest stable - v1.8.2 as of Dec 2025)
+    # Install Node Exporter
     NODE_VERSION="1.8.2"
-    wget -q https://github.com/prometheus/node_exporter/releases/download/v${NODE_VERSION}/node_exporter-${NODE_VERSION}.linux-amd64.tar.gz
-    tar xvfz node_exporter-${NODE_VERSION}.linux-amd64.tar.gz
-    mv node_exporter-${NODE_VERSION}.linux-amd64/node_exporter /usr/local/bin/
+    wget -q https://github.com/prometheus/node_exporter/releases/download/v$$NODE_VERSION/node_exporter-$$NODE_VERSION.linux-amd64.tar.gz
+    tar xvfz node_exporter-$$NODE_VERSION.linux-amd64.tar.gz
+    mv node_exporter-$$NODE_VERSION.linux-amd64/node_exporter /usr/local/bin/
     rm -rf node_exporter*
 
     useradd --no-create-home --shell /bin/false node_exporter || true
@@ -99,7 +99,7 @@ EOL
   tags = {
     Name        = "${var.name_prefix}-ec2"
     Environment = var.environment
-    Monitor     = "true"  # For Prometheus EC2 discovery
+    Monitor     = "true"
   }
 }
 
