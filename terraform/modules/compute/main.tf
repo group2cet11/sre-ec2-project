@@ -1,6 +1,10 @@
 #############################################
-# terraform/modules/compute/main.tf (fixed user_data interpolation)
+# terraform/modules/compute/main.tf
 #############################################
+
+############################
+# Security Group
+############################
 resource "aws_security_group" "ec2_sg" {
   name        = "${var.name_prefix}-ec2-sg"
   description = "Security group for ${var.name_prefix} EC2 instance"
@@ -27,7 +31,7 @@ resource "aws_security_group" "ec2_sg" {
     from_port   = 9100
     to_port     = 9100
     protocol    = "tcp"
-    cidr_blocks = ["10.0.0.0/16"]  # Adjust if your VPC CIDR is different
+    cidr_blocks = ["10.0.0.0/16"]
   }
 
   egress {
@@ -42,6 +46,9 @@ resource "aws_security_group" "ec2_sg" {
   }
 }
 
+############################
+# EC2 Instance
+############################
 resource "aws_instance" "app" {
   ami                         = var.ami_id
   instance_type               = var.instance_type
@@ -50,51 +57,21 @@ resource "aws_instance" "app" {
   key_name                    = var.key_name
   associate_public_ip_address = true
 
+  # Forces re-run if script changes
   user_data_replace_on_change = true
 
   user_data = <<-EOF
     #!/bin/bash
-    set -e
+    set -eux
 
-    # Update system
-    if command -v apt-get >/dev/null; then
-      apt-get update -y
-    elif command -v yum >/dev/null; then
-      yum update -y
+    # Install Node Exporter (centralized, versioned)
+    curl -fsSL https://raw.githubusercontent.com/mjmak0001/sre-ec2-project/main/scripts/install-node-exporter.sh | bash
+
+    # Optional demo page
+    if [ -d /var/www/html ]; then
+      echo "Hello SRE World! - ${var.environment} Environment" > /var/www/html/index.html
     fi
-
-    # Install Node Exporter
-    NODE_VERSION="1.8.2"
-    wget -q https://github.com/prometheus/node_exporter/releases/download/v$$NODE_VERSION/node_exporter-$$NODE_VERSION.linux-amd64.tar.gz
-    tar xvfz node_exporter-$$NODE_VERSION.linux-amd64.tar.gz
-    mv node_exporter-$$NODE_VERSION.linux-amd64/node_exporter /usr/local/bin/
-    rm -rf node_exporter*
-
-    useradd --no-create-home --shell /bin/false node_exporter || true
-
-    cat <<EOL > /etc/systemd/system/node-exporter.service
-[Unit]
-Description=Prometheus Node Exporter
-Wants=network-online.target
-After=network-online.target
-
-[Service]
-User=node_exporter
-Group=node_exporter
-Type=simple
-ExecStart=/usr/local/bin/node_exporter
-
-[Install]
-WantedBy=multi-user.target
-EOL
-
-    systemctl daemon-reload
-    systemctl enable node-exporter
-    systemctl start node-exporter
-
-    # Simple web page
-    echo "Hello SRE World! - ${var.environment} Environment" > /var/www/html/index.html
-    EOF
+  EOF
 
   tags = {
     Name        = "${var.name_prefix}-ec2"
@@ -103,6 +80,9 @@ EOL
   }
 }
 
+############################
+# Outputs
+############################
 output "public_ip" {
   value       = aws_instance.app.public_ip
   description = "Public IP of the EC2 instance"
