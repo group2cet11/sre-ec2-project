@@ -65,7 +65,7 @@ resource "aws_instance" "app" {
     set -eux
 
     # Install Node Exporter (centralized, versioned)
-    curl -fsSL https://raw.githubusercontent.com/mjmak0001/sre-ec2-project/main/scripts/install-node-exporter.sh | bash
+    curl -fsSL https://raw.githubusercontent.com/group2cet11/sre-ec2-project/main/scripts/install-node-exporter.sh | bash
 
     # Optional demo page
     if [ -d /var/www/html ]; then
