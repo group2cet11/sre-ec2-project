@@ -101,3 +101,6 @@ terraform apply tfplan
 ```
 
 > The GitHub Actions workflow will do most of this automatically on push to `main` once OIDC is configured. 
+
+ A more detailed deep dive can be located at https://deepwiki.com/group2cet11/sre-ec2-project
+ [Group 2 Project.pptx](https://github.com/user-attachments/files/24358027/Group.2.Project.pptx)
